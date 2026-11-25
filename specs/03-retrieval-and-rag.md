@@ -47,6 +47,17 @@ Questions like "what new risks did X add in 2023?" are routed to the `compare_se
 ## Config knobs (all eval-tunable)
 `chunk_size, overlap, top_k, use_hybrid, rrf_k, use_rerank, rerank_top_n, embedding_model, llm_model`
 
+## As built
+- **Modules:** `retrieval/` (`embedder.py`, `filters.py`, `search.py`, `rerank.py`, `retriever.py`, `indexer.py`), `llm/` (`provider.py`, `calllog.py`, `pricing.py`, `prompts.py`), `rag/` (`answer.py`, `citations.py`, `schemas.py`, `cli.py`).
+- **Embeddings:** `BAAI/bge-small-en-v1.5`, run locally. Chunks are embedded as context header + text, and queries get the bge query instruction prefix. `filinglens embed` is resumable and only embeds chunks with no embedding from the current `EMBEDDING_MODEL`.
+- **Filters:** rule-based. Tickers match only in upper case, and company names come from the ingestion CIK snapshot plus `config/company_aliases.yaml`. Fiscal years (`FY2023`, `fiscal 2023`, `FY'24`), forms (`10-K`/annual, `10-Q`/quarter) and explicit `Item N` mentions are also picked up. If nothing matches, filters are loosened in the order item → form → year; **the company filter is never dropped**.
+- **Dense search:** HNSW with `SET LOCAL hnsw.iterative_scan = relaxed_order` (pgvector ≥ 0.8), so restrictive filters still return k rows.
+- **Lexical search:** `websearch_to_tsquery` ANDs every word, so a full question rarely matches. Content words are joined with `OR` instead (stopwords and filter terms removed; quoted phrases kept) and ranked with `ts_rank_cd`. RRF runs in Python over the two SQL rankings.
+- **LLM:** `client.beta.messages.parse(output_format=AnswerDraft)` with the model's default adaptive thinking and `output_config.effort = LLM_EFFORT` (default `medium`). The server-side refusal fallback (`fallbacks: "default"`) is on for models that support it. The model cites short handles (`[C3]`), which are mapped back to real chunk IDs and renumbered `[1]`, `[2]`; accession and item come from the chunk, never from the model.
+- **Citation check:** a quote is verified if it scores at least 0.9 on normalized fuzzy partial matching; `...` gaps are allowed. Failed citations are kept, flagged `verified=false`, and counted in `citation_validity`.
+- **Logging:** every LLM call goes to `llm_calls` (model actually served, tokens, latency, cost, prompt version, stop reason). The daily spend cap is checked before each call. Each question is appended to `data/logs/queries.jsonl` with its timings, for p95 latency.
+- **Not yet:** routing year-over-year questions to `compare_sections` (spec 04). The eval comparison of baseline vs hybrid vs rerank and the p95 report belong to spec 05; the switches exist (`--dense-only`, `--hybrid`, `--rerank`).
+
 ## Acceptance criteria
 - [ ] CLI: `filinglens ask "What are Apple's main supply chain risks in FY2023?"` returns an answer with valid citations.
 - [ ] Eval report showing baseline vs hybrid vs hybrid+rerank on the same dataset.

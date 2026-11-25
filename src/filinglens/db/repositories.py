@@ -46,7 +46,10 @@ class PostgresSink:
 
     def __init__(self, database_url: str) -> None:
         """Connect and make sure the schema exists."""
-        self._conn = psycopg.connect(database_url)
+        # Autocommit: each `with transaction()` block is a real transaction that commits on
+        # exit. Without it, a bare SELECT (e.g. filing_exists) opens an implicit transaction
+        # that turns every later block into a savepoint, and nothing is ever committed.
+        self._conn = psycopg.connect(database_url, autocommit=True)
         with self._conn.transaction():
             self._conn.execute(schema_sql())
 

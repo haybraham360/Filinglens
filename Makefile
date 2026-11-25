@@ -1,4 +1,4 @@
-.PHONY: setup up down db api frontend landing ingest parse eval test lint typecheck check
+.PHONY: setup up down db api frontend landing ingest parse embed eval test-db test lint typecheck check
 
 setup:        ## Install Python deps (all extras) and landing page deps
 	uv sync --all-extras
@@ -28,11 +28,18 @@ ingest:
 parse:
 	uv run filinglens parse
 
+embed:        ## Embed chunks into pgvector
+	uv run filinglens embed
+
 eval:
 	uv run python -m evals.run --dataset golden_v1 --split dev
 
 test:
 	uv run pytest
+
+test-db:      ## Include Postgres tests (uses the filinglens_test database)
+	docker compose exec -T db psql -U filinglens -tc "SELECT 1 FROM pg_database WHERE datname='filinglens_test'" | grep -q 1 || docker compose exec -T db psql -U filinglens -c 'CREATE DATABASE filinglens_test'
+	FILINGLENS_TEST_DATABASE_URL=postgresql://filinglens:filinglens@localhost:5433/filinglens_test uv run pytest
 
 lint:
 	uv run ruff check . && uv run ruff format --check .

@@ -68,7 +68,26 @@ Uses the XBRL **frames** API to compare one concept across all companies for a p
 2. *"What new risk factors did Boeing add in its latest 10-K?"*
    → `compare_sections(BA, 1A, latest-1, latest)` → summarize the added headings with citations.
 
+## As built
+- **Modules:** `agent/tools.py` (Pydantic argument models, which also produce the strict tool schemas via `anthropic.transform_schema`), `agent/financials.py`, `agent/ratios.py`, `agent/diff.py`, `agent/sources.py`, `agent/guards.py`, `agent/loop.py`, `agent/cli.py`. Similarity measures live in `research/similarity.py` for reuse in spec 07.
+- **Loop:** a hand-written loop on `client.beta.messages.create`, at most `AGENT_MAX_STEPS` (6) model requests.
+  - The history is append-only: the full `response.content` (thinking blocks included) goes back unchanged, one user message carries all of a turn's tool results, and the tools and system prompt never change during a run.
+  - The model can call several tools in one turn; they run concurrently with a 20 s timeout each.
+  - Forced `tool_choice` returns a 400 on Sonnet 5.5, so steering is done in the prompt plus `strict: true` tools. On the last step the model gets an "answer now" text block and `tool_choice: none`.
+  - The final answer comes back as structured output (`AnswerDraft`) in the same request, and the server-side refusal fallback is on.
+- **Citations:** handles are `C#` (chunks), `P#` (paragraphs and headings from a section diff) and `T#` (financial tool results). Numbers are cited by quoting the exact value from the `T#` result, so they go through the same verified-citation check as filing text.
+- **No LLM arithmetic:** `agent/guards.py` flags any number in the answer that isn't supported by some tool result after rounding, unit scaling (thousand/million/billion) or ratio-to-percent conversion. Flags are stored in the trace as `unsupported_numbers`, for the eval in spec 05.
+- **`get_financials`:**
+  - The fiscal year comes from the period end date, because companyfacts' `fy` is the *filing's* fiscal year and comparatives inherit it.
+  - Annual values are 350–380-day durations. A balance-sheet value must fall on a 10-K's own balance-sheet date.
+  - `as_of` is `original` (first filed, the default) or `latest`.
+  - `period="Q"` keeps only the quarter each 10-Q itself reports.
+- **`compute_ratio`:** exact `Decimal` arithmetic, rounded half-even to 6 decimal places, returning its formula and inputs with sources. Ratios: gross/operating/net margin, ROE, ROA (year-end), current ratio, debt-to-equity, long-term-debt-to-equity, OCF margin, revenue and net-income growth.
+- **`compare_sections`:** reads parsed sections from parquet (originals only). Paragraphs are aligned by exact match, then a greedy one-to-one match on fuzzy plus embedding score. It reports added, removed and modified paragraphs and risk headings, the four classical similarity measures plus embedding cosine, and defaults to the latest 10-K versus the one before.
+- **Tracing:** every model request goes to `llm_calls` (`purpose=agent_step`), and each run appends steps (tool, args, latency, tokens, errors) to `data/logs/agent_traces.jsonl`.
+- **Not done:** the optional MCP server and `peer_compare`.
+
 ## Acceptance criteria
-- [ ] `compute_ratio` matches hand calculations exactly for 3 companies × 3 years.
+- [x] `compute_ratio` matches hand calculations exactly for 3 companies × 3 years (`tests/test_agent_tools.py`, on fixture figures modelled on reported results; re-check against real XBRL after ingestion).
 - [ ] Tool-selection eval (`specs/05`): ≥90% of agent questions call the expected tool(s).
 - [ ] No numeric answer is produced without a tool call (checked in evals).
