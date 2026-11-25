@@ -26,7 +26,7 @@ class Settings(BaseSettings):
     forms: Annotated[list[str], NoDecode] = ["10-K", "10-Q"]
 
     # Database
-    database_url: str = "postgresql://filinglens:filinglens@localhost:5432/filinglens"
+    database_url: str = "postgresql://filinglens:filinglens@localhost:5433/filinglens"
 
     # LLM
     anthropic_api_key: SecretStr | None = None
