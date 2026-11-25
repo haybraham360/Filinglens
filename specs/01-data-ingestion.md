@@ -72,6 +72,7 @@ Keep `filed_date`. The same period can be restated in later filings, so point-in
 - Zero-pad CIKs to 10 digits for data.sec.gov but **not** in Archive paths.
 - Submissions JSON includes only recent filings inline. Older ones are in the extra `files` listed in the JSON, so follow them.
 - Amendments (10-K/A) can be partial documents. Flag them and exclude them from the Lazy Prices comparison by default.
+- `acceptanceDateTime` in the submissions JSON ends in `Z` but is **US Eastern clock time**. Parse it as `America/New_York` and store UTC, or every timestamp lands 4–5 hours early.
 - Companies change tickers and names. **CIK is the stable ID.** Never key anything on ticker.
 - XBRL concepts vary by company (`Revenues` vs `RevenueFromContractWithCustomerExcludingAssessedTax`). Handle this with a concept-mapping table in `specs/04`.
 

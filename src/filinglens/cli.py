@@ -6,6 +6,7 @@ import typer
 
 from filinglens import __version__
 from filinglens.config import get_settings
+from filinglens.ingestion.cli import ingest
 
 app = typer.Typer(help="FilingLens: an AI analyst for SEC filings.", no_args_is_help=True)
 
@@ -32,14 +33,7 @@ def doctor() -> None:
         raise typer.Exit(code=1)
 
 
-@app.command()
-def ingest(
-    universe: str = typer.Option("pilot", help="Universe name."),
-    forms: str = typer.Option("10-K,10-Q", help="Comma-separated form types."),
-    since: int = typer.Option(2015, help="First fiscal year to ingest."),
-) -> None:
-    """Download filings and XBRL facts from SEC EDGAR (see specs/01)."""
-    raise NotImplementedError("Ingestion is the Week 1 milestone; see specs/01-data-ingestion.md")
+app.command(name="ingest")(ingest)
 
 
 @app.command()
