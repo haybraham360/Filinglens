@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 from collections.abc import Sequence
 from importlib import resources
 from types import TracebackType
@@ -12,6 +13,7 @@ import psycopg
 
 from filinglens.ingestion.facts import FACT_COLUMNS
 from filinglens.ingestion.filings import FILING_COLUMNS, FilingRecord
+from filinglens.parsing.pipeline import CHUNK_COLUMNS
 
 _UPSERT_FILINGS = f"""
 INSERT INTO filings ({", ".join(FILING_COLUMNS)})
@@ -85,9 +87,44 @@ class PostgresSink:
                     cp.write_row(tuple(_clean(v) for v in row))
         return len(facts)
 
+    def filing_exists(self, accession_no: str) -> bool:
+        """True if ``accession_no`` is in ``filings`` (chunks reference it)."""
+        row = self._conn.execute(
+            "SELECT 1 FROM filings WHERE accession_no = %s", (accession_no,)
+        ).fetchone()
+        return row is not None
+
+    def replace_chunks(self, accession_no: str, chunks: pd.DataFrame) -> bool:
+        """Replace a filing's chunks unless they are unchanged. Returns True if rewritten.
+
+        Unchanged chunk sets are left alone so embeddings computed later (specs/03) are
+        not wiped by re-running the parser.
+        """
+        existing = self._conn.execute(
+            "SELECT chunk_id, md5(text), coalesce(context_header, '') FROM chunks "
+            "WHERE accession_no = %s",
+            (accession_no,),
+        ).fetchall()
+        new = {
+            (
+                str(r["chunk_id"]),
+                hashlib.md5(str(r["text"]).encode()).hexdigest(),
+                str(r["context_header"]),
+            )
+            for r in chunks.to_dict("records")
+        }
+        if set(existing) == new:
+            return False
+        with self._conn.transaction(), self._conn.cursor() as cur:
+            cur.execute("DELETE FROM chunks WHERE accession_no = %s", (accession_no,))
+            with cur.copy(f"COPY chunks ({', '.join(CHUNK_COLUMNS)}) FROM STDIN") as cp:
+                for row in chunks[CHUNK_COLUMNS].itertuples(index=False, name=None):
+                    cp.write_row(tuple(_clean(v) for v in row))
+        return True
+
     def count(self, table: str, cik: str | None = None) -> int:
-        """Row count for ``filings`` or ``financial_facts``, optionally for one CIK."""
-        if table not in {"filings", "financial_facts"}:
+        """Row count for ``filings``, ``financial_facts`` or ``chunks``, optionally for one CIK."""
+        if table not in {"filings", "financial_facts", "chunks"}:
             raise ValueError(f"unknown table {table}")
         query = f"SELECT count(*) FROM {table}" + (" WHERE cik = %s" if cik else "")
         row = self._conn.execute(query, (cik,) if cik else ()).fetchone()

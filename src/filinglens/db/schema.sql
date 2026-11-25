@@ -52,6 +52,8 @@ CREATE TABLE IF NOT EXISTS chunks (
     embedding_model  text,
     tsv              tsvector GENERATED ALWAYS AS (to_tsvector('english', coalesce(heading, '') || ' ' || text)) STORED
 );
+-- Added in specs/02: the "[AAPL | 10-K | FY2023 | Item 1A ...]" header prepended before embedding.
+ALTER TABLE chunks ADD COLUMN IF NOT EXISTS context_header text;
 CREATE INDEX IF NOT EXISTS chunks_filter_idx ON chunks (cik, fiscal_year, form, item);
 CREATE INDEX IF NOT EXISTS chunks_tsv_idx ON chunks USING gin (tsv);
 CREATE INDEX IF NOT EXISTS chunks_embedding_idx ON chunks USING hnsw (embedding vector_cosine_ops);
