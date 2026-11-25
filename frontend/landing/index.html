@@ -1,0 +1,268 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>FilingLens — Answers from SEC filings, with the page they came from</title>
+  <meta name="description" content="FilingLens answers questions about 10-K and 10-Q filings with verifiable citations, shows what changed between years, and takes every number from reported XBRL data." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&family=Schibsted+Grotesk:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+
+  <header class="nav">
+    <div class="wrap nav__inner">
+      <a class="brand" href="#" aria-label="FilingLens home">
+        <svg class="brand__mark" viewBox="0 0 32 32" aria-hidden="true">
+          <rect x="5" y="3" width="17" height="22" rx="2" fill="none" stroke="currentColor" stroke-width="2.2"/>
+          <path d="M9 9h9M9 13h9M9 17h5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          <circle cx="21" cy="20" r="6" fill="var(--marker)" stroke="currentColor" stroke-width="2.2"/>
+          <path d="M25.5 24.5 29 28" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/>
+        </svg>
+        FilingLens
+      </a>
+      <nav aria-label="Primary">
+        <ul class="nav__links">
+          <li><a href="#changes">What changed</a></li>
+          <li><a href="#numbers">Numbers</a></li>
+          <li><a href="#evals">Evals</a></li>
+          <li><a href="#research">Research</a></li>
+        </ul>
+      </nav>
+      <a class="btn btn--small" href="#demo">Ask a question</a>
+    </div>
+  </header>
+
+  <main id="main">
+    <!-- HERO -->
+    <section class="hero">
+      <div class="wrap hero__grid">
+        <div class="hero__copy">
+          <h1 class="hero__title">Ask the filing.<br/>See the sentence that answers it.</h1>
+          <p class="hero__lede">FilingLens reads 10-K and 10-Q filings from SEC EDGAR, answers your questions with quotes you can check, shows what a company changed since last year, and takes every number from reported XBRL data instead of letting a model guess.</p>
+          <div class="hero__ctas">
+            <a class="btn" href="#demo">Try the demo</a>
+            <a class="btn btn--ghost" href="#changes">See a year-over-year diff</a>
+          </div>
+          <ul class="hero__facts">
+            <li><strong>20</strong> pilot companies, five years of filings</li>
+            <li><strong>Every answer</strong> cites a filing, an Item and a quote</li>
+          </ul>
+        </div>
+
+        <div class="demo" id="demo" aria-label="Interactive demo">
+          <div class="demo__bar">
+            <span class="demo__dots" aria-hidden="true"><i></i><i></i><i></i></span>
+            <span class="demo__title">HALV &nbsp;10-K &nbsp;FY2024</span>
+            <span class="demo__tag">Fictional company</span>
+          </div>
+          <div class="demo__body">
+            <div class="demo__chat">
+              <div class="chips" role="group" aria-label="Example questions">
+                <button class="chip is-active" data-q="0">Supply chain risks</button>
+                <button class="chip" data-q="1">Operating margin trend</button>
+                <button class="chip" data-q="2">Next year's revenue</button>
+              </div>
+              <div class="ask">
+                <span class="ask__icon" aria-hidden="true">?</span>
+                <p class="ask__text" id="askText" aria-live="polite"></p>
+                <span class="caret" aria-hidden="true"></span>
+              </div>
+              <div class="tool" id="toolRow" hidden></div>
+              <div class="answer" id="answer" aria-live="polite"></div>
+              <div class="meta" id="meta" hidden></div>
+            </div>
+            <div class="source" id="source" aria-label="Source filing excerpt">
+              <div class="source__head" id="sourceHead"></div>
+              <div class="source__text" id="sourceText"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- PIPELINE -->
+    <section class="pipeline" aria-labelledby="pipelineTitle">
+      <div class="wrap">
+        <h2 id="pipelineTitle" class="h2">From EDGAR to a cited answer</h2>
+        <ol class="steps">
+          <li>
+            <h3>Ingest</h3>
+            <p>Filings and XBRL facts come straight from SEC EDGAR, rate-limited, cached, and keyed on CIK so ticker changes never break history.</p>
+          </li>
+          <li>
+            <h3>Parse</h3>
+            <p>Each filing is split into its Items (Business, Risk Factors, MD&amp;A, Market Risk) and chunked without crossing section boundaries.</p>
+          </li>
+          <li>
+            <h3>Retrieve</h3>
+            <p>Hybrid search combines meaning and exact terms, filtered to the right company and year, then reranked for precision.</p>
+          </li>
+          <li>
+            <h3>Answer</h3>
+            <p>The model answers only from retrieved text. Every quote is checked against its source before you see it.</p>
+          </li>
+        </ol>
+      </div>
+    </section>
+
+    <!-- WHAT CHANGED -->
+    <section class="changes" id="changes" aria-labelledby="changesTitle">
+      <div class="wrap changes__grid">
+        <div class="changes__copy">
+          <h2 id="changesTitle" class="h2">Companies rarely announce what they quietly rewrote</h2>
+          <p class="body">Pick two years and FilingLens lines up the Risk Factors paragraph by paragraph: what was added, what was dropped, what was softened. It scores the change with five similarity measures, the same ones used in the research below.</p>
+
+          <div class="seg" role="tablist" aria-label="Filing view">
+            <button role="tab" class="seg__btn" data-view="old" aria-selected="false">FY2023</button>
+            <button role="tab" class="seg__btn is-active" data-view="diff" aria-selected="true">Changes</button>
+            <button role="tab" class="seg__btn" data-view="new" aria-selected="false">FY2024</button>
+          </div>
+
+          <dl class="sims" id="sims">
+            <div><dt>Cosine (term frequency)</dt><dd><span class="bar"><i data-v="0.91"></i></span><b data-v="0.91">0.00</b></dd></div>
+            <div><dt>Jaccard</dt><dd><span class="bar"><i data-v="0.78"></i></span><b data-v="0.78">0.00</b></dd></div>
+            <div><dt>Minimum edit</dt><dd><span class="bar"><i data-v="0.84"></i></span><b data-v="0.84">0.00</b></dd></div>
+            <div><dt>Simple (word diff)</dt><dd><span class="bar"><i data-v="0.86"></i></span><b data-v="0.86">0.00</b></dd></div>
+            <div><dt>Embedding cosine</dt><dd><span class="bar"><i data-v="0.94"></i></span><b data-v="0.94">0.00</b></dd></div>
+          </dl>
+          <p class="fine">1.00 means the text is identical. Scores shown are for this illustrative example.</p>
+        </div>
+
+        <article class="paper" id="paper" data-view="diff" aria-label="Item 1A Risk Factors comparison">
+          <header class="paper__head">
+            <span>Item 1A. Risk Factors</span>
+            <span class="paper__counts"><em class="c-add">2 added</em><em class="c-del">1 removed</em><em class="c-mod">2 modified</em></span>
+          </header>
+
+          <div class="rf">
+            <h4>Our revenue is concentrated among a small number of customers.</h4>
+            <p>Our ten largest customers accounted for <del>41%</del><ins>47%</ins> of net revenue during the fiscal year. The loss of, or a significant reduction in orders from, any of these customers could <del>adversely affect</del><ins>materially and adversely affect</ins> our results of operations.</p>
+          </div>
+
+          <div class="rf rf--del">
+            <h4><del>We rely on a single distributor for sales in Europe.</del></h4>
+            <p><del>Substantially all of our European sales are made through one distributor. If this relationship ended, we would need time to establish alternative channels.</del></p>
+          </div>
+
+          <div class="rf rf--add">
+            <h4><ins>We depend on a single supplier for gallium-nitride wafers.</ins></h4>
+            <p><ins>We purchase a specialised gallium-nitride wafer from one supplier and have not qualified an alternative source. Any interruption in supply could delay shipments for at least one quarter.</ins></p>
+          </div>
+
+          <div class="rf">
+            <h4>Changes in trade policy could increase our costs.</h4>
+            <p>Tariffs on components imported from <del>certain countries</del><ins>China, Malaysia and Vietnam</ins> may increase our cost of revenue, and we may not be able to pass these costs on to customers.</p>
+          </div>
+
+          <div class="rf rf--add">
+            <h4><ins>We are subject to an ongoing patent infringement lawsuit.</ins></h4>
+            <p><ins>In March, a competitor filed a complaint alleging that our HX-series sensors infringe three of its patents. We cannot currently estimate the range of possible loss.</ins></p>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <!-- NUMBERS / AGENT -->
+    <section class="numbers" id="numbers" aria-labelledby="numbersTitle">
+      <div class="wrap numbers__grid">
+        <div>
+          <h2 id="numbersTitle" class="h2">The model explains. Code does the math.</h2>
+          <p class="body">Language models are unreliable at arithmetic, so FilingLens never lets one produce a reported figure. An agent calls deterministic tools for financials and ratios, shows its formula and inputs, and only then writes the explanation.</p>
+          <button class="btn" id="runTrace">Replay the agent</button>
+          <p class="fine">Tools: search_filings, compare_sections, get_financials, compute_ratio. Six steps at most per question.</p>
+        </div>
+
+        <div class="trace" aria-live="polite">
+          <div class="trace__q">How did Halvorsen's operating margin change from FY2022 to FY2024, and why?</div>
+          <ol class="trace__steps" id="traceSteps">
+            <li class="tstep">
+              <code>get_financials</code>
+              <span class="targs">ticker="HALV", concepts=["revenue","operating_income"], years=[2022, 2023, 2024]</span>
+              <table class="ttable">
+                <thead><tr><th>Concept</th><th>FY2022</th><th>FY2023</th><th>FY2024</th></tr></thead>
+                <tbody>
+                  <tr><td>Revenue</td><td>$2,140M</td><td>$2,310M</td><td>$2,488M</td></tr>
+                  <tr><td>Operating income</td><td>$394M</td><td>$383M</td><td>$371M</td></tr>
+                </tbody>
+              </table>
+            </li>
+            <li class="tstep">
+              <code>compute_ratio</code>
+              <span class="targs">ratio="operating_margin" &nbsp; formula = OperatingIncomeLoss ÷ Revenues</span>
+              <div class="margins">
+                <div><span>FY2022</span><b>18.4%</b></div>
+                <div><span>FY2023</span><b>16.6%</b></div>
+                <div><span>FY2024</span><b>14.9%</b></div>
+              </div>
+            </li>
+            <li class="tstep">
+              <code>search_filings</code>
+              <span class="targs">ticker="HALV", item="7", query="drivers of operating margin"</span>
+              <p class="tquote">“…higher wafer costs and the expansion of our research and development headcount…”</p>
+            </li>
+            <li class="tstep tstep--final">
+              <span class="tdone">Answer ready</span>
+              <span class="targs">3 tool calls, 2 citations, 0 numbers written by the model</span>
+            </li>
+          </ol>
+        </div>
+      </div>
+    </section>
+
+    <!-- EVALS -->
+    <section class="evals" id="evals" aria-labelledby="evalsTitle">
+      <div class="wrap">
+        <h2 id="evalsTitle" class="h2">Every change has to beat the last score</h2>
+        <p class="body body--narrow">A hand-verified golden set of questions, a slice of FinanceBench, and a smoke test on every pull request. Chunk size, hybrid search, reranking and prompts are kept only when the numbers improve. These are the bars each release must clear.</p>
+        <div class="targets">
+          <div class="target"><b>≥ 95%</b><span>of citation quotes found verbatim in the cited chunk</span></div>
+          <div class="target"><b>≥ 90%</b><span>of agent questions call the expected tools</span></div>
+          <div class="target"><b>0</b><span>numeric answers produced without a tool call</span></div>
+          <div class="target"><b>&lt; 8 s</b><span>p95 latency for an answer without reranking</span></div>
+        </div>
+        <p class="fine">Unanswerable questions are part of the test set. Saying “the filings don’t say” counts as a correct answer.</p>
+      </div>
+    </section>
+
+    <!-- RESEARCH -->
+    <section class="research" id="research" aria-labelledby="researchTitle">
+      <div class="wrap research__grid">
+        <div>
+          <h2 id="researchTitle" class="h2">Do quiet rewrites predict returns?</h2>
+          <p class="body">Cohen, Malloy and Nguyen (<cite>Lazy Prices</cite>, Journal of Finance, 2020) found that firms which change their annual report language tend to underperform, and that the market takes months to notice. FilingLens replicates their four similarity measures and tests whether embedding-based signals add anything, including on filings after 2014, which the paper never saw.</p>
+          <blockquote class="pull">
+            <p>A portfolio long non-changers and short changers earned up to 188 basis points a month in the paper’s strongest specification, with returns building for up to 18 months and no reversal.</p>
+          </blockquote>
+        </div>
+        <ol class="method">
+          <li><h3>Score each 10-K against the last one</h3><p>Classical and embedding similarity, new and removed risk headings, and the change in negative-word share. Timestamped at SEC acceptance.</p></li>
+          <li><h3>Sort into quintiles</h3><p>Breakpoints come from the prior year only. A stock enters its portfolio the month after its filing.</p></li>
+          <li><h3>Hold and rebalance</h3><p>3, 6 and 12 month holding periods with overlapping cohorts, equal and value weighted.</p></li>
+          <li><h3>Test the alpha</h3><p>Fama–French 3 and 5 factor plus momentum regressions with Newey–West errors. Every variant tried is reported, not only the best.</p></li>
+        </ol>
+      </div>
+    </section>
+
+    <!-- CTA -->
+    <section class="cta">
+      <div class="wrap cta__inner">
+        <h2 class="cta__title">Ask a question you’d normally spend an afternoon on.</h2>
+        <a class="btn btn--light" href="#demo">Try the demo</a>
+      </div>
+    </section>
+  </main>
+
+  <footer class="foot">
+    <div class="wrap foot__inner">
+      <p><strong>FilingLens</strong>. Data from SEC EDGAR. Not investment advice.</p>
+      <p>Examples on this page use Halvorsen Instruments, a fictional company, and illustrative figures.</p>
+    </div>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>

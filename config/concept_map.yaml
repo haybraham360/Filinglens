@@ -1,0 +1,31 @@
+# Canonical financial concept -> ordered list of XBRL tags to try (specs/04).
+# The first tag with data for the requested period wins.
+revenue:
+  - Revenues
+  - RevenueFromContractWithCustomerExcludingAssessedTax
+  - SalesRevenueNet
+cost_of_revenue:
+  - CostOfRevenue
+  - CostOfGoodsAndServicesSold
+gross_profit:
+  - GrossProfit
+operating_income:
+  - OperatingIncomeLoss
+net_income:
+  - NetIncomeLoss
+total_assets:
+  - Assets
+current_assets:
+  - AssetsCurrent
+current_liabilities:
+  - LiabilitiesCurrent
+total_liabilities:
+  - Liabilities
+stockholders_equity:
+  - StockholdersEquity
+  - StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest
+long_term_debt:
+  - LongTermDebt
+  - LongTermDebtNoncurrent
+operating_cash_flow:
+  - NetCashProvidedByUsedInOperatingActivities

@@ -1,0 +1,8 @@
+{
+  "name": "filinglens",
+  "private": true,
+  "scripts": {
+    "dev": "npm --prefix frontend/landing run dev",
+    "build": "npm --prefix frontend/landing run build"
+  }
+}
