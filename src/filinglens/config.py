@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from functools import lru_cache
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Literal
 
 from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
@@ -24,6 +24,12 @@ class Settings(BaseSettings):
     universe_file: Path = Path("./config/pilot_universe.csv")
     start_year: int = Field(default=2015, ge=1994)
     forms: Annotated[list[str], NoDecode] = ["10-K", "10-Q"]
+
+    # Chunking (specs/02; final values chosen by evals in specs/05)
+    chunk_max_tokens: int = Field(default=448, gt=0)
+    chunk_overlap_tokens: int = Field(default=48, ge=0)
+    chunk_min_tokens: int = Field(default=64, ge=0)
+    chunk_strategy: Literal["structure", "fixed"] = "structure"
 
     # Database
     database_url: str = "postgresql://filinglens:filinglens@localhost:5433/filinglens"

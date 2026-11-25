@@ -7,6 +7,7 @@ import typer
 from filinglens import __version__
 from filinglens.config import get_settings
 from filinglens.ingestion.cli import ingest
+from filinglens.parsing.cli import parse, show_section
 
 app = typer.Typer(help="FilingLens: an AI analyst for SEC filings.", no_args_is_help=True)
 
@@ -34,6 +35,8 @@ def doctor() -> None:
 
 
 app.command(name="ingest")(ingest)
+app.command(name="parse")(parse)
+app.command(name="show-section")(show_section)
 
 
 @app.command()

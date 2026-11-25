@@ -1,4 +1,4 @@
-.PHONY: setup up down db api frontend landing ingest eval test lint typecheck check
+.PHONY: setup up down db api frontend landing ingest parse eval test lint typecheck check
 
 setup:        ## Install Python deps (all extras) and landing page deps
 	uv sync --all-extras
@@ -24,6 +24,9 @@ landing:      ## Run the landing page dev server
 
 ingest:
 	uv run filinglens ingest --universe pilot --forms 10-K,10-Q --since 2015
+
+parse:
+	uv run filinglens parse
 
 eval:
 	uv run python -m evals.run --dataset golden_v1 --split dev
