@@ -1,6 +1,8 @@
 services:
   db:
-    image: pgvector/pgvector:pg16
+    build:
+      context: .
+      dockerfile: docker/db.Dockerfile
     environment:
       POSTGRES_USER: filinglens
       POSTGRES_PASSWORD: filinglens
@@ -9,7 +11,6 @@ services:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
-      - ./src/filinglens/db/schema.sql:/docker-entrypoint-initdb.d/001_schema.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U filinglens"]
       interval: 5s
@@ -28,8 +29,9 @@ services:
         condition: service_healthy
 
   frontend:
-    build: .
-    command: ["streamlit", "run", "frontend/app.py", "--server.address=0.0.0.0", "--server.port=8501"]
+    build:
+      context: .
+      dockerfile: docker/frontend.Dockerfile
     environment:
       FILINGLENS_API_URL: http://api:8000
     ports:

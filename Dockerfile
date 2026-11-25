@@ -2,18 +2,17 @@
 FROM python:3.12-slim AS builder
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 WORKDIR /app
-ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy
+ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy UV_HTTP_TIMEOUT=300 UV_HTTP_RETRIES=10
 COPY pyproject.toml uv.lock README.md ./
-RUN uv sync --frozen --no-dev --extra frontend --no-install-project
+RUN uv sync --frozen --no-dev --no-install-project
 COPY src ./src
-RUN uv sync --frozen --no-dev --extra frontend
+RUN uv sync --frozen --no-dev
 
 FROM python:3.12-slim
 RUN useradd --create-home --uid 1000 app
 WORKDIR /app
 COPY --from=builder --chown=app:app /app /app
 COPY --chown=app:app config ./config
-COPY --chown=app:app frontend ./frontend
 ENV PATH="/app/.venv/bin:$PATH" PYTHONUNBUFFERED=1
 USER app
 EXPOSE 8000
