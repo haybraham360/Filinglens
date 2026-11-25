@@ -68,3 +68,8 @@ CREATE TABLE IF NOT EXISTS llm_calls (
     latency_ms     int,
     cost_usd       numeric(12, 6)
 );
+-- Added in specs/03.
+ALTER TABLE llm_calls ADD COLUMN IF NOT EXISTS purpose text;
+ALTER TABLE llm_calls ADD COLUMN IF NOT EXISTS prompt_version text;
+ALTER TABLE llm_calls ADD COLUMN IF NOT EXISTS stop_reason text;
+CREATE INDEX IF NOT EXISTS llm_calls_created_idx ON llm_calls (created_at);

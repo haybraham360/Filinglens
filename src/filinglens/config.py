@@ -39,9 +39,22 @@ class Settings(BaseSettings):
     llm_model: str = "claude-sonnet-5-5"
     llm_daily_spend_cap_usd: float = Field(default=5.0, ge=0)
 
+    llm_effort: Literal["low", "medium", "high", "xhigh", "max"] = "medium"
+    llm_max_tokens: int = Field(default=16000, gt=0)
+    agent_max_steps: int = Field(default=6, ge=2, le=12)
+
     # Embeddings
     embedding_model: str = "BAAI/bge-small-en-v1.5"
     embedding_dim: int = Field(default=384, gt=0)
+
+    # Retrieval (specs/03; eval-tunable)
+    retrieval_top_k: int = Field(default=8, gt=0)
+    retrieval_candidate_k: int = Field(default=40, gt=0)
+    use_hybrid: bool = True
+    rrf_k: int = Field(default=60, gt=0)
+    use_rerank: bool = False
+    rerank_top_n: int = Field(default=8, gt=0)
+    rerank_model: str = "BAAI/bge-reranker-base"
 
     # API
     api_cors_origins: Annotated[list[str], NoDecode] = ["http://localhost:8501"]
@@ -63,6 +76,11 @@ class Settings(BaseSettings):
     def processed_dir(self) -> Path:
         """Directory for parsed sections and chunks."""
         return self.data_dir / "processed"
+
+    @property
+    def log_dir(self) -> Path:
+        """Directory for query logs (latency, citation validity)."""
+        return self.data_dir / "logs"
 
     @property
     def cache_dir(self) -> Path:

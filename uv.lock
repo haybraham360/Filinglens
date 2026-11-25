@@ -1143,6 +1143,7 @@ dependencies = [
     { name = "pydantic" },
     { name = "pydantic-settings" },
     { name = "pyyaml" },
+    { name = "rapidfuzz" },
     { name = "typer" },
     { name = "uvicorn", extra = ["standard"] },
 ]
@@ -1177,7 +1178,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "anthropic", specifier = ">=0.40" },
+    { name = "anthropic", specifier = ">=2.14" },
     { name = "edgartools", specifier = ">=3.0" },
     { name = "fastapi", specifier = ">=0.115" },
     { name = "httpx", specifier = ">=0.27" },
@@ -1193,6 +1194,7 @@ requires-dist = [
     { name = "pydantic", specifier = ">=2.8" },
     { name = "pydantic-settings", specifier = ">=2.4" },
     { name = "pyyaml", specifier = ">=6.0" },
+    { name = "rapidfuzz", specifier = ">=3.9" },
     { name = "scikit-learn", marker = "extra == 'research'", specifier = ">=1.5" },
     { name = "sentence-transformers", marker = "extra == 'local-embeddings'", specifier = ">=3.0" },
     { name = "statsmodels", marker = "extra == 'research'", specifier = ">=0.14" },

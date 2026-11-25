@@ -5,9 +5,11 @@ from __future__ import annotations
 import typer
 
 from filinglens import __version__
+from filinglens.agent.cli import agent
 from filinglens.config import get_settings
 from filinglens.ingestion.cli import ingest
 from filinglens.parsing.cli import parse, show_section
+from filinglens.rag.cli import ask, embed
 
 app = typer.Typer(help="FilingLens: an AI analyst for SEC filings.", no_args_is_help=True)
 
@@ -37,12 +39,9 @@ def doctor() -> None:
 app.command(name="ingest")(ingest)
 app.command(name="parse")(parse)
 app.command(name="show-section")(show_section)
-
-
-@app.command()
-def ask(question: str) -> None:
-    """Answer a question about the ingested filings, with citations (see specs/03)."""
-    raise NotImplementedError("RAG is the Week 3 milestone; see specs/03-retrieval-and-rag.md")
+app.command(name="embed")(embed)
+app.command(name="ask")(ask)
+app.command(name="agent")(agent)
 
 
 if __name__ == "__main__":
