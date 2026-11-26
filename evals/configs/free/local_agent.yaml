@@ -1,0 +1,5 @@
+description: Free - rule-based tool routing; local qwen2.5:3b writes the answer from tool results.
+mode: agent
+llm: {model: "qwen2.5:3b", provider: ollama}
+judge: {model: none, provider: none}
+concurrency: 1

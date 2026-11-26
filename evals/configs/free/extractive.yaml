@@ -1,0 +1,4 @@
+description: Free - no LLM. Extractive answers (verbatim cited sentences); programmatic metrics only.
+mode: rag
+llm: {model: none, provider: none}
+judge: {model: none, provider: none}

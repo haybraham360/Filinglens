@@ -95,18 +95,23 @@ def ask(
     hybrid: bool | None = typer.Option(None, "--hybrid/--dense-only", help="Add full-text + RRF."),
     rerank: bool | None = typer.Option(None, "--rerank/--no-rerank", help="Cross-encoder rerank."),
     filters: bool = typer.Option(True, "--filters/--no-filters", help="Company/year filtering."),
+    provider: str | None = typer.Option(
+        None, help="anthropic | ollama | none (extractive, free). Default: LLM_PROVIDER."
+    ),
     as_json: bool = typer.Option(False, "--json", help="Print the structured answer as JSON."),
     show_context: bool = typer.Option(False, help="Also print the retrieved chunks."),
 ) -> None:
     """Answer a question about the ingested filings, with verified citations."""
-    from filinglens.llm.provider import AnthropicLLM
+    from filinglens.llm.factory import make_llm, resolve_provider
+    from filinglens.llm.ollama import OllamaUnavailableError
 
     settings = get_settings()
-    if settings.anthropic_api_key is None:
+    chosen = resolve_provider(settings, provider)
+    if chosen == "none":
         typer.secho(
-            "Note: ANTHROPIC_API_KEY is not set; using the SDK's other credential "
-            "sources (ANTHROPIC_AUTH_TOKEN or an `ant auth login` profile).",
-            fg=typer.colors.YELLOW,
+            "No LLM configured: extractive answer (verbatim passages, free). Set "
+            "LLM_PROVIDER=ollama or add ANTHROPIC_API_KEY for written answers.",
+            fg=typer.colors.BRIGHT_BLACK,
             err=True,
         )
     cfg = retrieval_config(
@@ -120,17 +125,7 @@ def ask(
     conn = _connect(settings)
     with conn:
         retriever = build_retriever(settings, conn, cfg)
-        import anthropic
-
-        key = settings.anthropic_api_key.get_secret_value() if settings.anthropic_api_key else None
-        llm = AnthropicLLM(
-            settings.llm_model,
-            PostgresCallLog(conn),
-            effort=settings.llm_effort,
-            max_tokens=settings.llm_max_tokens,
-            daily_cap_usd=settings.llm_daily_spend_cap_usd,
-            client=anthropic.Anthropic(api_key=key) if key else anthropic.Anthropic(),
-        )
+        llm = make_llm(settings, chosen, PostgresCallLog(conn))
         try:
             result = answer_question(
                 question, retriever, llm, query_log=settings.log_dir / "queries.jsonl"
@@ -138,17 +133,32 @@ def ask(
         except SpendCapExceededError as exc:
             typer.secho(str(exc), fg=typer.colors.RED, err=True)
             raise typer.Exit(code=3) from exc
-        except anthropic.AuthenticationError as exc:
-            typer.secho(
-                "Anthropic API authentication failed: set ANTHROPIC_API_KEY in .env.",
-                fg=typer.colors.RED,
-                err=True,
-            )
+        except OllamaUnavailableError as exc:
+            typer.secho(f"{exc} Or use --provider none.", fg=typer.colors.RED, err=True)
             raise typer.Exit(code=2) from exc
-        except anthropic.APIConnectionError as exc:
-            typer.secho(f"Could not reach the Anthropic API: {exc}", fg=typer.colors.RED, err=True)
-            raise typer.Exit(code=2) from exc
+        except Exception as exc:
+            _anthropic_error(exc)
+            raise
     _print(result, as_json=as_json, show_context=show_context)
+
+
+def _anthropic_error(exc: Exception) -> None:
+    """Turn Anthropic auth/connection errors into a clean exit (other errors propagate)."""
+    try:
+        import anthropic
+    except ImportError:  # pragma: no cover
+        return
+    if isinstance(exc, anthropic.AuthenticationError):
+        typer.secho(
+            "Anthropic API authentication failed: set ANTHROPIC_API_KEY in .env, "
+            "or use --provider ollama|none.",
+            fg=typer.colors.RED,
+            err=True,
+        )
+        raise typer.Exit(code=2) from exc
+    if isinstance(exc, anthropic.APIConnectionError):
+        typer.secho(f"Could not reach the Anthropic API: {exc}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(code=2) from exc
 
 
 def _print(result: AnswerResult, *, as_json: bool, show_context: bool) -> None:

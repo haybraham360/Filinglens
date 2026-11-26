@@ -66,6 +66,26 @@ How to build it fast: let an LLM *draft* questions from sampled chunks, then **y
 | E6 | metadata filter on/off | big gain on company/year questions |
 | E7 | 2 LLMs | quality vs cost trade-off |
 
+## As built
+See `evals/README.md` for the workflow.
+- **Datasets:** `evals/dataset.py`. Cases also carry `gold_spans` (accession, item, character range), so retrieval hits are measured by overlap and comparable across chunking configs. `verified_by` is required to score. Splits are a random stratified 70/30 with a fixed seed.
+- **Drafting** (`evals/draft.py`):
+  - Factual: Opus 5.5 writes questions from sampled chunks.
+  - Numeric: from `get_financials`/`compute_ratio`. The reviewer must check each value against the filing, because the tool under test produced it.
+  - YoY: added risk headings from `compare_sections`.
+  - Multi-hop: a ratio change plus an Opus summary of MD&A drivers.
+  - Unanswerable: templated.
+- **Verification:** `evals/verify.py` is interactive and shows each candidate's evidence text from the parsed filing.
+- **Runner** (`evals/run.py`): `retrieval` / `rag` / `agent` modes, running the app's real entry points.
+  - Each run writes `results.jsonl`, `errors.jsonl` and per-case traces, and resumes at (case, rep).
+  - Failure classes: API error after jittered retries, timeout (per-case wall-clock ceiling), judge error, served-model mismatch.
+  - Truncated answers are excluded from means.
+  - `--system oracle|null` checks the harness itself.
+- **Judge** (`evals/judge.py`): Opus 5.5 by default, chosen to differ from the Sonnet 5.5 under test. One property per call (correctness, faithfulness), structured outputs, a rubric that says not to reward length, candidate text treated as data, no server fallback, and a known-negatives self-check. Prompts are in `src/filinglens/llm/prompts/judge_*_v1.md`. Judge-human agreement uses `evals/label.py` (exact, binary and Cohen's kappa).
+- **Experiments:** E1–E6 run in `retrieval` mode (no LLM cost) through `evals/experiments.py`. Index-time variants (E1–E3) each build an isolated `eval_<fingerprint>` Postgres schema. E7 is `configs/llm_haiku.yaml` against `configs/hybrid.yaml`.
+- **CI:** offline harness tests on every PR. The paid 10-question smoke is a manual workflow (`eval-smoke.yml`) that needs `ANTHROPIC_API_KEY` and a corpus snapshot (`make eval-snapshot`).
+- **FinanceBench:** `evals/financebench.py` converts the 10-K/10-Q subset to unverified candidates and documents what was dropped.
+
 ## Acceptance criteria
 - [ ] Golden set v1 (≥50 verified questions) committed.
 - [ ] Judge-human agreement measured and reported.

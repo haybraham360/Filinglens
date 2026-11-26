@@ -1,0 +1,3 @@
+description: E4 - dense-only retrieval (no full-text / RRF).
+mode: retrieval
+retrieval: {use_hybrid: false}

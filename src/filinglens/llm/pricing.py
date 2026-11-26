@@ -33,6 +33,10 @@ PRICES: dict[str, Price] = {
 }
 
 
+# Served-model names of local (Ollama) models start with this prefix; they cost nothing.
+LOCAL_PREFIX = "ollama/"
+
+
 def cost_usd(
     model: str,
     input_tokens: int,
@@ -40,7 +44,9 @@ def cost_usd(
     cache_read_tokens: int = 0,
     cache_write_tokens: int = 0,
 ) -> float | None:
-    """Cost of one call, or ``None`` for a model without a known price."""
+    """Cost of one call, or ``None`` for a model without a known price (local models: 0)."""
+    if model.startswith(LOCAL_PREFIX):
+        return 0.0
     price = PRICES.get(model)
     if price is None:
         return None

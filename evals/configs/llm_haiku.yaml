@@ -1,0 +1,3 @@
+description: E7 - same pipeline answered by Haiku 5.5 (quality vs cost against hybrid.yaml).
+mode: rag
+llm: {model: claude-haiku-5-5, effort: medium}

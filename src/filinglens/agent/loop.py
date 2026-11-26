@@ -70,6 +70,25 @@ class AgentResult:
     cost_usd: float = 0.0
     latency_ms: int = 0
     model: str | None = None
+    fallback_used: bool = False
+    input_tokens: int = 0
+    output_tokens: int = 0
+    final_stop_reason: str | None = None
+    transcript: list[dict[str, Any]] = field(default_factory=list)
+    cited_texts: dict[int, str] = field(default_factory=dict)
+
+
+def _jsonable_message(message: dict[str, Any]) -> dict[str, Any]:
+    """A message with SDK content blocks converted to plain dicts (for saved traces)."""
+    content = message["content"]
+    if isinstance(content, list):
+        content = [
+            block.model_dump(mode="json")
+            if hasattr(block, "model_dump")
+            else (vars(block) if hasattr(block, "__dict__") else block)
+            for block in content
+        ]
+    return {"role": message["role"], "content": content}
 
 
 def _insufficient(message: str) -> Answer:
@@ -77,7 +96,10 @@ def _insufficient(message: str) -> Answer:
 
 
 def resolve_agent_citations(
-    draft: AnswerDraft, registry: SourceRegistry, threshold: float = QUOTE_THRESHOLD
+    draft: AnswerDraft,
+    registry: SourceRegistry,
+    threshold: float = QUOTE_THRESHOLD,
+    texts_out: dict[int, str] | None = None,
 ) -> Answer:
     """Map C#/P#/T# handles to sources, verify each quote, renumber markers [1], [2], ..."""
     order: list[str] = []
@@ -95,6 +117,8 @@ def resolve_agent_citations(
         if src is None:
             continue
         score = quote_match_score(c.quote, src.text)
+        if texts_out is not None:
+            texts_out[number[ref]] = src.text
         citations.append(
             Citation(
                 n=number[ref],
@@ -255,6 +279,9 @@ class Agent:
         start = time.perf_counter()
         answer: Answer | None = None
         model_used: str | None = None
+        fallback_used = False
+        final_stop: str | None = None
+        cited_texts: dict[int, str] = {}
 
         # Not a `with` block: shutting down must not wait for a tool that timed out.
         pool = ThreadPoolExecutor(max_workers=4)
@@ -273,6 +300,11 @@ class Agent:
                 latency = int((time.perf_counter() - t0) * 1000)
                 total_cost += self._log_llm(response, latency, trace_id)
                 model_used = str(response.model)
+                final_stop = response.stop_reason
+                fallback_used = fallback_used or any(
+                    getattr(entry, "type", None) == "fallback_message"
+                    for entry in (getattr(response.usage, "iterations", None) or [])
+                )
                 steps.append(
                     Step(
                         index=len(steps),
@@ -301,7 +333,7 @@ class Agent:
                         results.append({"type": "text", "text": FINAL_NUDGE})
                     messages.append({"role": "user", "content": results})
                     continue
-                answer = self._final_answer(response, registry)
+                answer = self._final_answer(response, registry, cited_texts)
                 break
         finally:
             pool.shutdown(wait=False, cancel_futures=True)
@@ -318,18 +350,26 @@ class Agent:
             cost_usd=round(total_cost, 6),
             latency_ms=int((time.perf_counter() - start) * 1000),
             model=model_used,
+            fallback_used=fallback_used,
+            input_tokens=sum(s.input_tokens or 0 for s in steps if s.kind == "llm"),
+            output_tokens=sum(s.output_tokens or 0 for s in steps if s.kind == "llm"),
+            final_stop_reason=final_stop,
+            transcript=[_jsonable_message(m) for m in messages],
+            cited_texts=cited_texts,
         )
         if self.trace_log is not None:
             self._write_trace(question, result)
         return result
 
-    def _final_answer(self, response: Any, registry: SourceRegistry) -> Answer:
+    def _final_answer(
+        self, response: Any, registry: SourceRegistry, cited_texts: dict[int, str]
+    ) -> Answer:
         text = "".join(b.text for b in response.content if b.type == "text").strip()
         try:
             draft = AnswerDraft.model_validate_json(text)
         except ValidationError:
             return _insufficient("The model's final answer could not be parsed.")
-        return resolve_agent_citations(draft, registry)
+        return resolve_agent_citations(draft, registry, texts_out=cited_texts)
 
     def _write_trace(self, question: str, result: AgentResult) -> None:
         assert self.trace_log is not None

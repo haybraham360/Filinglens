@@ -1,0 +1,3 @@
+description: E6 - no company/year/form metadata filtering before search.
+mode: retrieval
+retrieval: {use_filters: false}

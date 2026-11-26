@@ -9,12 +9,12 @@ from typing import Any
 import typer
 
 from filinglens.agent.loop import Agent, AgentResult
+from filinglens.agent.router import RouterAgent
 from filinglens.config import Settings, get_settings
 from filinglens.llm.calllog import PostgresCallLog, SpendCapExceededError
 
 
-def build_agent(settings: Settings, conn: Any, client: Any) -> Agent:
-    """Wire the agent's tools to Postgres, parsed sections and the embedding model."""
+def _context_factory(settings: Settings, conn: Any) -> Any:
     from filinglens.agent.diff import SectionStore
     from filinglens.agent.financials import PostgresFactStore
     from filinglens.agent.sources import SourceRegistry
@@ -37,11 +37,16 @@ def build_agent(settings: Settings, conn: Any, client: Any) -> Agent:
             concept_map_path=concept_map,
         )
 
+    return context
+
+
+def build_agent(settings: Settings, conn: Any, client: Any) -> Agent:
+    """The Claude tool-calling agent, wired to Postgres, parsed sections and embeddings."""
     return Agent(
         client,
         settings.llm_model,
         PostgresCallLog(conn),
-        context,
+        _context_factory(settings, conn),
         effort=settings.llm_effort,
         max_steps=settings.agent_max_steps,
         max_tokens=settings.llm_max_tokens,
@@ -50,37 +55,60 @@ def build_agent(settings: Settings, conn: Any, client: Any) -> Agent:
     )
 
 
+def build_router_agent(settings: Settings, conn: Any, provider: str) -> RouterAgent:
+    """The rule-based agent; a local Ollama model (if chosen) writes the answer."""
+    from filinglens.llm.factory import make_llm
+
+    llm = make_llm(settings, "ollama", PostgresCallLog(conn)) if provider == "ollama" else None
+    return RouterAgent(_context_factory(settings, conn), llm)
+
+
 def agent(
     question: str = typer.Argument(..., help="Question about the ingested filings."),
+    provider: str | None = typer.Option(
+        None, help="anthropic (Claude picks tools) | ollama | none (rules pick tools; free)."
+    ),
     as_json: bool = typer.Option(False, "--json", help="Print answer and trace as JSON."),
     trace: bool = typer.Option(False, "--trace", help="Show each step (tools, args, latency)."),
 ) -> None:
     """Answer a question with tools: filing search, YoY section diff, XBRL financials, ratios."""
-    import anthropic
-
-    from filinglens.rag.cli import _connect
+    from filinglens.llm.factory import resolve_provider
+    from filinglens.llm.ollama import OllamaUnavailableError
+    from filinglens.rag.cli import _anthropic_error, _connect
 
     settings = get_settings()
-    key = settings.anthropic_api_key.get_secret_value() if settings.anthropic_api_key else None
-    client = anthropic.Anthropic(api_key=key) if key else anthropic.Anthropic()
+    chosen = resolve_provider(settings, provider)
     conn = _connect(settings)
     with conn:
-        runner = build_agent(settings, conn, client)
         try:
-            result = runner.run(question)
+            if chosen == "anthropic":
+                import anthropic
+
+                key = (
+                    settings.anthropic_api_key.get_secret_value()
+                    if settings.anthropic_api_key
+                    else None
+                )
+                client = anthropic.Anthropic(api_key=key) if key else anthropic.Anthropic()
+                result = build_agent(settings, conn, client).run(question)
+            else:
+                if chosen == "none":
+                    typer.secho(
+                        "No LLM configured: rules pick the tools and the answer is "
+                        "templated from their results (free).",
+                        fg=typer.colors.BRIGHT_BLACK,
+                        err=True,
+                    )
+                result = build_router_agent(settings, conn, chosen).run(question)
         except SpendCapExceededError as exc:
             typer.secho(str(exc), fg=typer.colors.RED, err=True)
             raise typer.Exit(code=3) from exc
-        except anthropic.AuthenticationError as exc:
-            typer.secho(
-                "Anthropic API authentication failed: set ANTHROPIC_API_KEY in .env.",
-                fg=typer.colors.RED,
-                err=True,
-            )
+        except OllamaUnavailableError as exc:
+            typer.secho(f"{exc} Or use --provider none.", fg=typer.colors.RED, err=True)
             raise typer.Exit(code=2) from exc
-        except anthropic.APIConnectionError as exc:
-            typer.secho(f"Could not reach the Anthropic API: {exc}", fg=typer.colors.RED, err=True)
-            raise typer.Exit(code=2) from exc
+        except Exception as exc:
+            _anthropic_error(exc)
+            raise
     _print(result, as_json=as_json, trace=trace)
 
 

@@ -319,6 +319,7 @@ TOOLS: tuple[Tool, ...] = (
         "to compare the latest 10-K with the one before.",
         CompareSectionsArgs,
         compare_sections,
+        cites_result=True,
     ),
     Tool(
         "get_financials",

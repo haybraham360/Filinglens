@@ -21,3 +21,10 @@ def test_missing_edgar_identity_is_rejected(monkeypatch: pytest.MonkeyPatch) -> 
     monkeypatch.delenv("EDGAR_IDENTITY", raising=False)
     with pytest.raises(ValueError, match="EDGAR_IDENTITY"):
         Settings(_env_file=None).require_edgar_identity()
+
+
+def test_blank_anthropic_key_counts_as_unset(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "")
+    assert Settings(_env_file=None).anthropic_api_key is None
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "  ")
+    assert Settings(_env_file=None).anthropic_api_key is None

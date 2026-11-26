@@ -9,9 +9,11 @@ from datetime import date
 from pathlib import Path
 from typing import Any
 
+import pandas as pd
 import psycopg
 import pytest
 
+from filinglens.db.connection import connect
 from filinglens.ingestion.filings import FilingRecord
 from filinglens.parsing.chunker import FilingInfo, chunk_section
 from filinglens.parsing.pipeline import chunks_frame
@@ -179,3 +181,99 @@ def test_get_financials_from_postgres_matches_frame_store() -> None:
     finally:
         c.execute("DELETE FROM financial_facts WHERE cik = %s", (cik,))
         c.close()
+
+
+def test_eval_runner_retrieval_mode_against_isolated_index(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """evals.run end to end: builds eval_<fp>.chunks from parsed sections, never public.chunks."""
+    import json
+
+    import evals.run as run_mod
+    import yaml
+    from evals.dataset import Case, GoldSpan, write_jsonl
+
+    from filinglens.config import get_settings
+    from filinglens.parsing.chunker import ChunkConfig
+    from filinglens.parsing.pipeline import run_parse
+    from tests.test_parsing_chunks import _setup_processed
+
+    assert URL
+    processed = _setup_processed(tmp_path)
+    run_parse(processed, ChunkConfig())
+    monkeypatch.setenv("DATABASE_URL", URL)
+    monkeypatch.setenv("DATA_DIR", str(tmp_path))
+    monkeypatch.setattr(run_mod, "REPORTS_DIR", tmp_path / "reports")
+    get_settings.cache_clear()
+    sec = pd.read_parquet(processed / "sections" / "0000999001" / "0000999001-23-000010.parquet")
+    text = sec.set_index("item").loc["1A", "text"]
+    start = text.index("Many components")
+    cases = [
+        Case(
+            id="r1",
+            question="ACME semiconductor shortages and single-source components",
+            type="factual",
+            gold_answer="x",
+            ticker="ACME",
+            split="dev",
+            verified_by="t",
+            gold_spans=[
+                GoldSpan(
+                    accession_no="0000999001-23-000010",
+                    item="1A",
+                    char_start=start,
+                    char_end=start + 200,
+                )
+            ],
+        ),
+    ]
+    data = tmp_path / "golden_t.jsonl"
+    write_jsonl(data, cases)
+    cfg_path = tmp_path / "r.yaml"
+    cfg_path.write_text(
+        yaml.safe_dump(
+            {
+                "name": "r",
+                "mode": "retrieval",
+                "concurrency": 1,
+                "index": {"embedding_model": "hashing-bow-v1"},
+                "retrieval": {"use_filters": False},
+            }
+        )
+    )
+    pub_before = connect(URL, apply_schema=False).execute("SELECT count(*) FROM chunks").fetchone()
+    try:
+        code = run_mod.main(
+            ["--dataset", str(data), "--split", "dev", "--config", str(cfg_path), "--run-id", "t1"]
+        )
+        assert code == 0
+        summary = json.loads((tmp_path / "reports" / "t1.json").read_text())
+        assert summary["counts"]["ok"] == 1 and summary["counts"]["open_errors"] == 0
+        assert summary["metrics"]["recall_at_10"]["mean"] == 1.0
+        schema = summary["meta"]["index_schema"]
+        c = connect(URL, apply_schema=False)
+        n = c.execute(f'SELECT count(*), count(embedding) FROM "{schema}".chunks').fetchone()
+        assert n is not None and n[0] > 0 and n[0] == n[1]
+        assert c.execute("SELECT count(*) FROM chunks").fetchone() == pub_before
+        # second run reuses the built index and resumes (nothing re-scored)
+        assert (
+            run_mod.main(
+                [
+                    "--dataset",
+                    str(data),
+                    "--split",
+                    "dev",
+                    "--config",
+                    str(cfg_path),
+                    "--run-id",
+                    "t1",
+                ]
+            )
+            == 0
+        )
+        rows = (tmp_path / "reports" / "runs" / "t1" / "results.jsonl").read_text().splitlines()
+        assert len(rows) == 1
+        c.execute(f'DROP SCHEMA "{schema}" CASCADE')
+        c.close()
+    finally:
+        get_settings.cache_clear()

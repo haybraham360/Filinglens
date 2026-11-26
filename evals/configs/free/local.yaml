@@ -1,0 +1,5 @@
+description: Free - local qwen2.5:3b via Ollama writes RAG answers. No judge by default (small local judges are unreliable).
+mode: rag
+llm: {model: "qwen2.5:3b", provider: ollama}
+judge: {model: none, provider: none}
+concurrency: 1

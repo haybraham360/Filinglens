@@ -31,8 +31,11 @@ def embed_pending_chunks(
     batch_size: int = 256,
     limit: int | None = None,
     progress: Callable[[int, int], None] | None = None,
+    include_header: bool = True,
 ) -> int:
     """Embed ``context_header + text`` for pending chunks, committing per batch.
+
+    ``include_header=False`` embeds the chunk text alone (eval experiment E3).
 
     Resumable: an interrupted run keeps finished batches, and re-running only picks up what
     is left. Raises if the model's dimension doesn't match the ``vector(n)`` column.
@@ -55,7 +58,9 @@ def embed_pending_chunks(
         ).fetchall()
         if not rows:
             break
-        texts = [f"{header}\n{text}" if header else text for _, header, text in rows]
+        texts = [
+            f"{header}\n{text}" if header and include_header else text for _, header, text in rows
+        ]
         vectors = embedder.embed_documents(texts)
         with conn.transaction(), conn.cursor() as cur:
             cur.executemany(
