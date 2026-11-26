@@ -1,0 +1,5 @@
+description: Manual CI smoke - 10 dev questions, cheap model under test, Sonnet judge.
+mode: rag
+llm: {model: claude-haiku-5-5, effort: low}
+judge: {model: claude-sonnet-5-5, effort: medium}
+concurrency: 4

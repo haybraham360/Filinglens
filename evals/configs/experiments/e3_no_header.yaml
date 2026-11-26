@@ -1,0 +1,3 @@
+description: E3 - embed chunk text without the "[TICKER | form | FY | item | heading]" context header.
+mode: retrieval
+index: {context_header: false}

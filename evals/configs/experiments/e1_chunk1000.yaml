@@ -1,0 +1,3 @@
+description: E1 - ~1000-token structure-aware chunks (bge-small truncates input past 512 tokens; that cost is part of what E1 measures).
+mode: retrieval
+index: {chunk_max_tokens: 1000, chunk_overlap_tokens: 100, chunk_min_tokens: 142}

@@ -1,0 +1,70 @@
+name: Eval smoke (manual, paid)
+
+# Runs the 10-question smoke eval against a restored corpus snapshot. Manual only: it
+# makes paid Anthropic API calls. Needs the ANTHROPIC_API_KEY secret and the
+# EVAL_CORPUS_URL variable (a tarball made with `make eval-snapshot`).
+on:
+  workflow_dispatch:
+    inputs:
+      n:
+        description: Number of dev questions
+        default: "10"
+      max_drop_pts:
+        description: Fail if correctness drops more than this many points vs the committed baseline
+        default: "10"
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    services:
+      db:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: filinglens
+          POSTGRES_PASSWORD: filinglens
+          POSTGRES_DB: filinglens
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U filinglens" --health-interval 5s --health-retries 20
+    env:
+      DATABASE_URL: postgresql://filinglens:filinglens@localhost:5432/filinglens
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      EDGAR_IDENTITY: "FilingLens CI ci@example.com"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      - run: uv sync --all-extras --frozen
+      - name: Restore corpus snapshot
+        env:
+          EVAL_CORPUS_URL: ${{ vars.EVAL_CORPUS_URL }}
+        run: |
+          test -n "$EVAL_CORPUS_URL" || { echo "Set the EVAL_CORPUS_URL repo variable"; exit 1; }
+          curl -fsSL "$EVAL_CORPUS_URL" -o corpus.tar.gz
+          tar xzf corpus.tar.gz
+          uv run python -c "from filinglens.db.connection import connect; connect('$DATABASE_URL').close()"
+          PGPASSWORD=filinglens pg_restore -h localhost -U filinglens -d filinglens --data-only data/eval_db.dump
+      - name: Smoke eval
+        run: uv run python -m evals.run --dataset golden_v1 --split dev --config evals/configs/smoke.yaml --limit ${{ inputs.n }} --run-id ci_smoke
+      - name: Compare with committed baseline
+        run: |
+          uv run python - <<'PY'
+          import json, pathlib, sys
+          new = json.loads(pathlib.Path("evals/reports/ci_smoke.json").read_text())
+          base_path = pathlib.Path("evals/reports/smoke_baseline.json")
+          if not base_path.exists():
+              print("No committed smoke_baseline.json yet; commit this run's summary as the baseline.")
+              sys.exit(0)
+          base = json.loads(base_path.read_text())
+          drop = (base["metrics"]["correctness"]["mean"] - new["metrics"]["correctness"]["mean"]) * 100
+          print(f"correctness change: {-drop:+.1f} pts")
+          sys.exit(1 if drop > float("${{ inputs.max_drop_pts }}") else 0)
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: eval-smoke
+          path: |
+            evals/reports/ci_smoke.*
+            evals/reports/runs/ci_smoke/

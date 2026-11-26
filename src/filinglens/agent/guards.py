@@ -64,14 +64,26 @@ def _numbers(text: str, *, for_answer: bool) -> list[tuple[str, Decimal]]:
     return out
 
 
-def _matches(answer_value: Decimal, source_value: Decimal) -> bool:
+def numbers_in(text: str, *, skip_years_and_counts: bool = True) -> list[tuple[str, Decimal]]:
+    """``(raw text, value)`` for each number in ``text`` (units and % applied)."""
+    return _numbers(text, for_answer=skip_years_and_counts)
+
+
+def matches_value(
+    answer_value: Decimal, source_value: Decimal, tolerance: Decimal = TOLERANCE
+) -> bool:
+    """True if ``answer_value`` presents ``source_value`` (rounded, scaled, or as a %)."""
+    return _matches(answer_value, source_value, tolerance)
+
+
+def _matches(answer_value: Decimal, source_value: Decimal, tolerance: Decimal = TOLERANCE) -> bool:
     for factor in _PRESENTATION:
         target = source_value * factor
         if target == 0:
             if answer_value == 0:
                 return True
             continue
-        if abs(answer_value - target) / abs(target) <= TOLERANCE:
+        if abs(answer_value - target) / abs(target) <= tolerance:
             return True
     return False
 

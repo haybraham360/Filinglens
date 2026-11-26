@@ -1,0 +1,3 @@
+description: E4 baseline - dense-only retrieval (no full-text / RRF).
+mode: rag
+retrieval: {use_hybrid: false}

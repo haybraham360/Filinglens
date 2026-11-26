@@ -32,6 +32,10 @@ class AnswerResult:
     llm_model: str | None = None
     timings_ms: dict[str, float] = field(default_factory=dict)
     cost_usd: float | None = None
+    stop_reason: str | None = None
+    input_tokens: int = 0
+    output_tokens: int = 0
+    fallback_used: bool = False
 
 
 def filing_index_url(cik: str, accession_no: str) -> str:
@@ -126,16 +130,22 @@ def _insufficient(message: str) -> Answer:
 def answer_question(
     question: str,
     retriever: Retriever,
-    llm: StructuredLLM,
+    llm: StructuredLLM | None,
     *,
     prompt: Prompt | None = None,
     query_log: Path | None = None,
+    retrieval: RetrievalResult | None = None,
 ) -> AnswerResult:
-    """Answer ``question`` from retrieved filing chunks, with verified citations."""
+    """Answer ``question`` from retrieved filing chunks, with verified citations.
+
+    ``llm=None`` gives an extractive answer (verbatim sentences, no LLM, free).
+    ``retrieval`` lets a caller (the eval runner) pass results it already computed.
+    """
     prompt = prompt or load_prompt("answer")
     trace_id = uuid.uuid4().hex
     start = time.perf_counter()
-    retrieval = retriever.retrieve(question)
+    if retrieval is None:
+        retrieval = retriever.retrieve(question)
     timings = {f"retrieval_{k}": v for k, v in retrieval.timings_ms.items()}
 
     if not retrieval.chunks:
@@ -146,6 +156,16 @@ def answer_question(
             ),
             retrieval=retrieval,
             trace_id=trace_id,
+        )
+    elif llm is None:
+        from filinglens.rag.extractive import extractive_answer
+
+        result = AnswerResult(
+            answer=extractive_answer(question, retrieval.chunks, retrieval.filters),
+            retrieval=retrieval,
+            trace_id=trace_id,
+            llm_model="extractive",
+            cost_usd=0.0,
         )
     else:
         context, handles = build_context(retrieval.chunks)
@@ -173,6 +193,10 @@ def answer_question(
             trace_id=trace_id,
             llm_model=llm_result.model,
             cost_usd=llm_result.cost_usd,
+            stop_reason=llm_result.stop_reason,
+            input_tokens=llm_result.input_tokens,
+            output_tokens=llm_result.output_tokens,
+            fallback_used=llm_result.fallback_used,
         )
     timings["total"] = (time.perf_counter() - start) * 1000
     result.timings_ms = timings

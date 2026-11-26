@@ -35,8 +35,13 @@ class Settings(BaseSettings):
     database_url: str = "postgresql://filinglens:filinglens@localhost:5433/filinglens"
 
     # LLM
+    # "auto": Claude if ANTHROPIC_API_KEY is set, else Ollama if it is running, else no LLM
+    # (extractive answers and the rule-based tool router; free and deterministic).
+    llm_provider: Literal["auto", "anthropic", "ollama", "none"] = "auto"
     anthropic_api_key: SecretStr | None = None
     llm_model: str = "claude-sonnet-5-5"
+    ollama_url: str = "http://localhost:11434"
+    ollama_model: str = "qwen2.5:3b"
     llm_daily_spend_cap_usd: float = Field(default=5.0, ge=0)
 
     llm_effort: Literal["low", "medium", "high", "xhigh", "max"] = "medium"
@@ -58,6 +63,14 @@ class Settings(BaseSettings):
 
     # API
     api_cors_origins: Annotated[list[str], NoDecode] = ["http://localhost:8501"]
+
+    @field_validator("anthropic_api_key", mode="before")
+    @classmethod
+    def _blank_key_is_none(cls, value: object) -> object:
+        """``ANTHROPIC_API_KEY=`` (empty, as in .env.example) means no key."""
+        if isinstance(value, str) and not value.strip():
+            return None
+        return value
 
     @field_validator("forms", "api_cors_origins", mode="before")
     @classmethod

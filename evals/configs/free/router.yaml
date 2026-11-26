@@ -1,0 +1,4 @@
+description: Free - no LLM. Rule-based tool routing with templated answers (tool selection, numbers w/o tools).
+mode: agent
+llm: {model: none, provider: none}
+judge: {model: none, provider: none}
