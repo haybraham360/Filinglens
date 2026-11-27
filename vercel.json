@@ -1,4 +1,4 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "ignoreCommand": "git diff --quiet HEAD^ HEAD -- src pyproject.toml uv.lock Dockerfile.vercel .dockerignore config vercel.json"
+  "ignoreCommand": "git diff --quiet HEAD^ HEAD -- src pyproject.toml uv.lock Dockerfile.vercel .dockerignore config vercel.json .vercelignore"
 }

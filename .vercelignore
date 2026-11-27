@@ -1,10 +1,28 @@
-# The filinglens-api Vercel project builds Dockerfile.vercel: upload only what it needs.
-/*
-!Dockerfile.vercel
-!vercel.json
-!.dockerignore
-!pyproject.toml
-!uv.lock
-!README.md
-!src
-!config
+# filinglens-api builds Dockerfile.vercel: leave out everything the image doesn't need.
+# (No "/*" whitelist: Git builds must keep .git so vercel.json's ignoreCommand can diff.)
+.env*
+data
+seed.tar.gz
+frontend
+notebooks
+evals
+reports
+research_report.md
+tests
+loadtest
+deploy
+docker
+specs
+.github
+Dockerfile
+docker-compose.yml
+render.yaml
+Makefile
+package.json
+package-lock.json
+node_modules
+.venv
+.mypy_cache
+.ruff_cache
+.pytest_cache
+**/__pycache__
