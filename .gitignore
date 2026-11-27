@@ -12,7 +12,7 @@ models/
 
 # Eval raw runs (traces, per-case rows); summaries in evals/reports/*.json|md are committed
 evals/reports/runs/
-eval_corpus.tar.gz
+seed.tar.gz
 
 # Python
 __pycache__/

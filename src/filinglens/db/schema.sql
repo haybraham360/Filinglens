@@ -73,3 +73,13 @@ ALTER TABLE llm_calls ADD COLUMN IF NOT EXISTS purpose text;
 ALTER TABLE llm_calls ADD COLUMN IF NOT EXISTS prompt_version text;
 ALTER TABLE llm_calls ADD COLUMN IF NOT EXISTS stop_reason text;
 CREATE INDEX IF NOT EXISTS llm_calls_created_idx ON llm_calls (created_at);
+
+-- Added in specs/06: request traces for GET /traces/{trace_id} ("How I got this answer").
+CREATE TABLE IF NOT EXISTS traces (
+    trace_id    text PRIMARY KEY,
+    created_at  timestamptz NOT NULL DEFAULT now(),
+    question    text NOT NULL,
+    mode        text NOT NULL,
+    payload     jsonb NOT NULL
+);
+CREATE INDEX IF NOT EXISTS traces_created_idx ON traces (created_at);

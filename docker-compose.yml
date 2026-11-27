@@ -1,3 +1,4 @@
+# Local stack: `make up` (or `docker compose up --build`), then open http://localhost:8501
 services:
   db:
     build:
@@ -22,6 +23,12 @@ services:
     env_file: .env
     environment:
       DATABASE_URL: postgresql://filinglens:filinglens@db:5432/filinglens
+      DATA_DIR: /app/data
+      OLLAMA_URL: ${OLLAMA_URL_FROM_DOCKER:-http://host.docker.internal:11434}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"  # reach Ollama running on the host
+    volumes:
+      - ./data:/app/data  # parsed sections + universe snapshot written by ingest/parse
     ports:
       - "8000:8000"
     depends_on:
@@ -37,7 +44,8 @@ services:
     ports:
       - "8501:8501"
     depends_on:
-      - api
+      api:
+        condition: service_healthy
 
   adminer:
     image: adminer

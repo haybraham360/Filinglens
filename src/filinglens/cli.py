@@ -7,6 +7,7 @@ import typer
 from filinglens import __version__
 from filinglens.agent.cli import agent
 from filinglens.config import get_settings
+from filinglens.db.cli import seed_export, seed_import
 from filinglens.ingestion.cli import ingest
 from filinglens.parsing.cli import parse, show_section
 from filinglens.rag.cli import ask, embed
@@ -42,6 +43,8 @@ app.command(name="show-section")(show_section)
 app.command(name="embed")(embed)
 app.command(name="ask")(ask)
 app.command(name="agent")(agent)
+app.command(name="seed-export")(seed_export)
+app.command(name="seed-import")(seed_import)
 
 
 if __name__ == "__main__":

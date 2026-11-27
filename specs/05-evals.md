@@ -83,7 +83,7 @@ See `evals/README.md` for the workflow.
   - `--system oracle|null` checks the harness itself.
 - **Judge** (`evals/judge.py`): Opus 5.5 by default, chosen to differ from the Sonnet 5.5 under test. One property per call (correctness, faithfulness), structured outputs, a rubric that says not to reward length, candidate text treated as data, no server fallback, and a known-negatives self-check. Prompts are in `src/filinglens/llm/prompts/judge_*_v1.md`. Judge-human agreement uses `evals/label.py` (exact, binary and Cohen's kappa).
 - **Experiments:** E1–E6 run in `retrieval` mode (no LLM cost) through `evals/experiments.py`. Index-time variants (E1–E3) each build an isolated `eval_<fingerprint>` Postgres schema. E7 is `configs/llm_haiku.yaml` against `configs/hybrid.yaml`.
-- **CI:** offline harness tests on every PR. The paid 10-question smoke is a manual workflow (`eval-smoke.yml`) that needs `ANTHROPIC_API_KEY` and a corpus snapshot (`make eval-snapshot`).
+- **CI:** offline harness tests on every PR. The paid 10-question smoke is a manual workflow (`eval-smoke.yml`) that needs `ANTHROPIC_API_KEY` and a corpus snapshot (`make seed-export`).
 - **FinanceBench:** `evals/financebench.py` converts the 10-K/10-Q subset to unverified candidates and documents what was dropped.
 
 ## Acceptance criteria

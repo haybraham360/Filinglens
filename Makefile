@@ -1,4 +1,4 @@
-.PHONY: setup up down db api frontend landing ingest parse embed eval eval-free eval-offline experiments eval-snapshot test-db test lint typecheck check
+.PHONY: setup up down db api frontend landing loadtest prod-up ingest parse embed eval eval-free eval-offline experiments seed-export test-db test lint typecheck check
 
 setup:        ## Install Python deps (all extras) and landing page deps
 	uv sync --all-extras
@@ -18,6 +18,14 @@ api:          ## Run the API locally with reload
 
 frontend:     ## Run the Streamlit app locally
 	uv run streamlit run frontend/app.py
+
+API_URL ?= http://localhost:8000
+
+loadtest:     ## 20 concurrent /ask requests against a running API (raise its rate limit first)
+	uv run python -m loadtest --url $(API_URL) --concurrency 20 --requests 60
+
+prod-up:      ## VPS: compose + Caddy HTTPS (needs DOMAIN and POSTGRES_PASSWORD)
+	docker compose -f docker-compose.yml -f deploy/docker-compose.prod.yml up -d --build
 
 landing:      ## Run the landing page dev server
 	npm --prefix frontend/landing run dev
@@ -45,10 +53,8 @@ eval-offline: ## Harness checks with oracle and null systems (free)
 experiments:  ## Retrieval experiments E1-E6 on the test split (free: no LLM calls)
 	uv run python -m evals.experiments --split test
 
-eval-snapshot: ## Package the corpus the manual CI smoke eval restores (DB tables + parsed data)
-	docker compose exec -T db pg_dump -U filinglens -Fc -t filings -t chunks -t financial_facts filinglens > data/eval_db.dump
-	tar czf eval_corpus.tar.gz data/eval_db.dump data/processed/sections data/processed/facts data/raw/universe
-	@echo "Upload eval_corpus.tar.gz (e.g. as a GitHub release asset) and set the EVAL_CORPUS_URL repo variable."
+seed-export:  ## Bundle the ingested corpus for a deployment or the CI smoke eval
+	uv run filinglens seed-export --out seed.tar.gz
 
 test:
 	uv run pytest

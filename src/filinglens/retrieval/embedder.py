@@ -68,6 +68,42 @@ class SentenceTransformerEmbedder:
         return vec
 
 
+class FastEmbedEmbedder:
+    """ONNX runtime embeddings via ``fastembed`` (default backend; no PyTorch).
+
+    Produces the same vectors as sentence-transformers for ``BAAI/bge-small-en-v1.5``
+    (cosine 1.0000 in a side-by-side check), with ~150 MB of dependencies instead of 1 GB+
+    and ~360 MB peak RAM, so the API fits small hosting tiers.
+    """
+
+    def __init__(
+        self, model_name: str, *, batch_size: int = 32, cache_dir: str | None = None
+    ) -> None:
+        """Load ``model_name`` (downloads ~65 MB on first use)."""
+        from fastembed import TextEmbedding
+
+        self.model_name = model_name
+        self.batch_size = batch_size
+        self._model: Any = TextEmbedding(model_name, cache_dir=cache_dir)
+        self.dim = int(self._model.embedding_size)
+        self._query_prefix = BGE_QUERY_INSTRUCTION if "bge" in model_name.lower() else ""
+
+    def embed_documents(self, texts: Sequence[str]) -> Vector:
+        """Embed passages, L2-normalized."""
+        if not texts:
+            return np.zeros((0, self.dim), dtype=np.float32)
+        out = np.asarray(
+            list(self._model.embed(list(texts), batch_size=self.batch_size)), dtype=np.float32
+        )
+        norms = np.linalg.norm(out, axis=1, keepdims=True)
+        return np.asarray(out / np.where(norms == 0, 1, norms), dtype=np.float32)
+
+    def embed_query(self, text: str) -> Vector:
+        """Embed a query with the bge query instruction (as sentence-transformers does)."""
+        vec: Vector = self.embed_documents([self._query_prefix + text])[0]
+        return vec
+
+
 class HashingEmbedder:
     """Deterministic bag-of-words hashing embedder for tests and offline smoke runs.
 
@@ -98,8 +134,26 @@ class HashingEmbedder:
         return self._embed(text)
 
 
-def load_embedder(model_name: str) -> Embedder:
-    """Embedder for ``model_name``; ``hashing-*`` names give :class:`HashingEmbedder`."""
+_CACHE: dict[tuple[str, str], Embedder] = {}
+
+
+def load_embedder(model_name: str, backend: str | None = None) -> Embedder:
+    """Embedder for ``model_name`` (cached per process).
+
+    ``backend``: ``fastembed`` (default, ONNX) or ``sentence-transformers``; defaults to the
+    ``EMBEDDING_BACKEND`` setting. ``hashing-*`` names give :class:`HashingEmbedder`.
+    """
     if model_name.startswith("hashing"):
         return HashingEmbedder(model_name=model_name)
-    return SentenceTransformerEmbedder(model_name)
+    if backend is None:
+        from filinglens.config import get_settings
+
+        backend = get_settings().embedding_backend
+    key = (backend, model_name)
+    if key not in _CACHE:
+        _CACHE[key] = (
+            SentenceTransformerEmbedder(model_name)
+            if backend == "sentence-transformers"
+            else FastEmbedEmbedder(model_name)
+        )
+    return _CACHE[key]

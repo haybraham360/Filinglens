@@ -35,6 +35,15 @@ def _score(sentence: str, terms: set[str]) -> int:
     return len(words & terms) + len({w[:6] for w in words if len(w) >= 4} & terms)
 
 
+def _is_heading(paragraph: str) -> bool:
+    """Short, single-line, not ending like a sentence: a block heading."""
+    return (
+        0 < len(paragraph) <= 160
+        and "\n" not in paragraph
+        and not paragraph.rstrip().endswith((".", ":", ";"))
+    )
+
+
 def best_sentences(
     question: str, texts: list[str], filters: QueryFilters, limit: int = MAX_SENTENCES
 ) -> list[tuple[int, str]]:
@@ -44,14 +53,20 @@ def best_sentences(
     candidates: list[tuple[float, int, str]] = []
     for rank, text in enumerate(texts):
         best: tuple[float, str] | None = None
-        sentences = (sent for para in text.split("\n\n") for sent in _SENTENCE.split(para))
-        for sentence in sentences:
-            sentence = sentence.strip()
-            if not (MIN_CHARS <= len(sentence) <= MAX_CHARS) or sentence.startswith("|"):
+        heading_score = 0.0  # words of the heading above count, at half weight
+        for para in text.split("\n\n"):
+            para = para.strip()
+            if _is_heading(para):
+                heading_score = 0.5 * _score(para, terms)
                 continue
-            score = _score(sentence, terms) - 0.1 * rank
-            if best is None or score > best[0]:
-                best = (score, sentence)
+            for sentence in _SENTENCE.split(para):
+                sentence = sentence.strip()
+                if not (MIN_CHARS <= len(sentence) <= MAX_CHARS) or sentence.startswith("|"):
+                    continue
+                own = _score(sentence, terms)
+                score = own + heading_score - 0.1 * rank
+                if (own or heading_score) and (best is None or score > best[0]):
+                    best = (score, sentence)
         if best is not None and best[0] > 0:
             candidates.append((best[0], rank, best[1]))
     chosen = sorted(candidates, key=lambda c: (-c[0], c[1]))[:limit]

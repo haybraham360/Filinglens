@@ -13,6 +13,7 @@ import json
 import re
 import time
 import uuid
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import TimeoutError as FutureTimeout
 from dataclasses import asdict, dataclass, field
@@ -76,6 +77,19 @@ class AgentResult:
     final_stop_reason: str | None = None
     transcript: list[dict[str, Any]] = field(default_factory=list)
     cited_texts: dict[int, str] = field(default_factory=dict)
+
+
+class _NotifyingList(list[Step]):
+    """A step list that reports each appended step (for streaming progress)."""
+
+    def __init__(self, callback: Callable[[Step], None] | None) -> None:
+        super().__init__()
+        self._callback = callback
+
+    def append(self, step: Step) -> None:
+        super().append(step)
+        if self._callback is not None:
+            self._callback(step)
 
 
 def _jsonable_message(message: dict[str, Any]) -> dict[str, Any]:
@@ -268,12 +282,12 @@ class Agent:
             results.append(result)
         return results
 
-    def run(self, question: str) -> AgentResult:
-        """Answer ``question`` with tools; returns the answer and trace."""
+    def run(self, question: str, on_step: Callable[[Step], None] | None = None) -> AgentResult:
+        """Answer ``question`` with tools; ``on_step`` is called as each step finishes."""
         trace_id = uuid.uuid4().hex
         registry = SourceRegistry()
         ctx = self.context_factory(registry)
-        steps: list[Step] = []
+        steps: list[Step] = _NotifyingList(on_step)
         messages: list[dict[str, Any]] = [{"role": "user", "content": question}]
         total_cost = 0.0
         start = time.perf_counter()
