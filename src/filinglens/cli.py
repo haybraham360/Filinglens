@@ -11,6 +11,7 @@ from filinglens.db.cli import seed_export, seed_import
 from filinglens.ingestion.cli import ingest
 from filinglens.parsing.cli import parse, show_section
 from filinglens.rag.cli import ask, embed
+from filinglens.research.cli import research
 
 app = typer.Typer(help="FilingLens: an AI analyst for SEC filings.", no_args_is_help=True)
 
@@ -45,6 +46,7 @@ app.command(name="ask")(ask)
 app.command(name="agent")(agent)
 app.command(name="seed-export")(seed_export)
 app.command(name="seed-import")(seed_import)
+app.add_typer(research, name="research")
 
 
 if __name__ == "__main__":

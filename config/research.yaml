@@ -1,0 +1,15 @@
+# Pre-registered Lazy Prices variant grid (specs/07). Fix this before looking at results,
+# and don't tune anything on the post-2014 period. The report lists every variant run.
+signals: [sim_cosine_tf, sim_jaccard, sim_minedit, sim_simple, sim_embed, n_new_risks, lm_neg_delta, llm_change_severity]
+main_section: full          # the paper's main results use the whole document
+sections: [full, "1A", "3", "7"]
+main_hold: 3                # paper: "firms are held in the portfolio for 3 months"
+holds: [3, 6, 12]
+weightings: [ew, vw]
+breakpoints: [prior_year, trailing_12m]   # prior_year = Table II; the text also says "prior month"
+models: [excess, ff3, paper5, ff5_mom]    # paper5 = FF3 + momentum + Pastor-Stambaugh liquidity
+cost_bps: [0, 10, 25]       # one-way cost per unit of weight traded
+split_month: "2015-01"      # the paper's sample ends in 2014; later months are out of sample
+size_terciles: true
+exclude_microcaps: true
+min_breakpoint_obs: 25

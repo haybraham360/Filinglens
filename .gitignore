@@ -38,3 +38,6 @@ node_modules/
 
 # Claude Code local settings
 .claude/settings.local.json
+
+# Research pipeline check output (regenerate with `make research-synthetic`)
+reports/research/synthetic/
