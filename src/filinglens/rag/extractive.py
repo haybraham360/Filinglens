@@ -49,6 +49,46 @@ def best_sentences(
 ) -> list[tuple[int, str]]:
     """``(text index, sentence)`` pairs: the best sentence of each text, top ``limit``,
     returned in text order. Texts with no matching sentence are skipped."""
+    chosen = sorted(_candidates(question, texts, filters), key=lambda c: (-c[0], c[1]))[:limit]
+    return [(rank, sentence) for _, rank, sentence in sorted(chosen, key=lambda c: c[1])]
+
+
+def _norm_sentence(sentence: str) -> str:
+    return re.sub(r"\W+", " ", sentence.lower()).strip()
+
+
+def pick_sentences(
+    question: str,
+    texts: list[str],
+    years: list[int | None],
+    filters: QueryFilters,
+    limit: int = MAX_SENTENCES,
+) -> list[tuple[int, str]]:
+    """Like :func:`best_sentences`, for passages from several fiscal years.
+
+    Filings repeat boilerplate year after year, so the same sentence often comes back
+    from several 10-Ks. Each distinct sentence is kept once, from the most recent filing.
+    Newer filings also get a small boost (at most half a matching word), so when no
+    year is asked for, current disclosures win ties. Results are ordered newest first.
+    """
+    known = [y for y in years if y is not None]
+    lo, hi = (min(known), max(known)) if known else (0, 0)
+    best: dict[str, tuple[float, int, int, str]] = {}  # norm -> (score, year, idx, sentence)
+    for score, idx, sentence in _candidates(question, texts, filters):
+        year = years[idx] or lo
+        boosted = score + (0.5 * (year - lo) / (hi - lo) if hi > lo else 0.0)
+        key = _norm_sentence(sentence)
+        seen = best.get(key)
+        if seen is None or (year, boosted) > (seen[1], seen[0]):
+            best[key] = (max(boosted, seen[0]) if seen else boosted, year, idx, sentence)
+    chosen = sorted(best.values(), key=lambda c: (-c[0], c[2]))[:limit]
+    return [(idx, sentence) for _, _, idx, sentence in sorted(chosen, key=lambda c: (-c[1], -c[0]))]
+
+
+def _candidates(
+    question: str, texts: list[str], filters: QueryFilters
+) -> list[tuple[float, int, str]]:
+    """``(score, text index, sentence)``: the best-scoring sentence of each text."""
     terms = _terms(question, filters)
     candidates: list[tuple[float, int, str]] = []
     for rank, text in enumerate(texts):
@@ -69,14 +109,15 @@ def best_sentences(
                     best = (score, sentence)
         if best is not None and best[0] > 0:
             candidates.append((best[0], rank, best[1]))
-    chosen = sorted(candidates, key=lambda c: (-c[0], c[1]))[:limit]
-    return [(rank, sentence) for _, rank, sentence in sorted(chosen, key=lambda c: c[1])]
+    return candidates
 
 
 def extractive_answer(question: str, chunks: list[RetrievedChunk], filters: QueryFilters) -> Answer:
     """Build an :class:`Answer` from the best matching sentences of the retrieved chunks."""
     terms = _terms(question, filters)
-    picked = best_sentences(question, [c.text for c in chunks], filters)
+    picked = pick_sentences(
+        question, [c.text for c in chunks], [c.fiscal_year for c in chunks], filters
+    )
     if not picked:
         return Answer(
             answer="No passage in the retrieved filings matches this question closely enough "

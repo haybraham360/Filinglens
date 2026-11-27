@@ -2,7 +2,9 @@
 
 An AI analyst for SEC filings (10-K / 10-Q). It answers questions with citations, shows what changed between filings, computes financial metrics with real tools, and tests whether filing changes predict stock returns (a "Lazy Prices" replication with LLMs).
 
-> Work in progress. See `CLAUDE.md` for the project guide and `specs/` for component specs.
+**Live:** [filinglens-two.vercel.app](https://filinglens-two.vercel.app). Open [the app](https://filinglens-two.vercel.app/app) to ask questions about 10-Ks from Apple, Amazon, JPMorgan Chase, Coca-Cola, Microsoft, NVIDIA and Tesla (FY2020–2026). The API is at [filinglens-api-one.vercel.app](https://filinglens-api-one.vercel.app/docs). It runs on Vercel and Neon; see `deploy/README.md`.
+
+> See `CLAUDE.md` for the project guide and `specs/` for component specs.
 
 **It runs for free.** With no API key, answers are extractive (verbatim, cited filing sentences) and a rule-based router picks the tools (XBRL financials, exact ratios, year-over-year risk-factor diffs). A local model through [Ollama](https://ollama.com) can write the answers, and Claude takes over when `ANTHROPIC_API_KEY` is set. Numbers always come from code, never from a language model.
 

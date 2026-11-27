@@ -25,7 +25,7 @@ from filinglens.agent.sources import SourceRegistry
 from filinglens.agent.tools import AgentContext, run_tool
 from filinglens.llm.prompts import load_prompt
 from filinglens.llm.provider import StructuredLLM
-from filinglens.rag.extractive import best_sentences
+from filinglens.rag.extractive import pick_sentences
 from filinglens.rag.schemas import Answer, AnswerDraft, DraftCitation
 from filinglens.retrieval.filters import QueryFilters, parse_filters
 
@@ -105,11 +105,11 @@ def plan(
     ratio = next(
         (r for phrase, r in RATIO_PHRASES if re.search(rf"\b{re.escape(phrase)}\b", q)), None
     )
+    # Reported values asked for alongside a ratio ("revenue and net margin") are fetched too.
     concepts: list[str] = []
-    if ratio is None:
-        for phrase, concept in CONCEPT_PHRASES:
-            if re.search(rf"\b{re.escape(phrase)}\b", q) and concept not in concepts:
-                concepts.append(concept)
+    for phrase, concept in CONCEPT_PHRASES:
+        if re.search(rf"\b{re.escape(phrase)}\b", q) and concept not in concepts:
+            concepts.append(concept)
     numeric = bool(ratio or concepts)
     explain = bool(_EXPLAIN.search(q))
     change = bool(_CHANGE.search(q)) and (bool(_RISKY.search(q)) or not numeric)
@@ -132,7 +132,7 @@ def plan(
                         "compute_ratio", {"ticker": ticker, "ratio": ratio, "fiscal_years": years}
                     )
                 )
-            else:
+            if concepts:
                 calls.append(
                     PlannedCall(
                         "get_financials",
@@ -140,7 +140,7 @@ def plan(
                     )
                 )
     if explain or not calls:
-        search: dict[str, Any] = {"query": question, "top_k": 6}
+        search: dict[str, Any] = {"query": question, "top_k": 10}
         if ticker:
             search["ticker"] = ticker
         if filters.fiscal_years:
@@ -220,7 +220,8 @@ def template_answer(
             ok = True
         elif call.name == "search_filings":
             texts = [r["text"] for r in out["results"]]
-            for idx, sentence in best_sentences(question, texts, filters):
+            years = [r.get("fiscal_year") for r in out["results"]]
+            for idx, sentence in pick_sentences(question, texts, years, filters):
                 r = out["results"][idx]
                 lines.append(
                     f"- {r['ticker']} {r['form']} FY{r['fiscal_year']} Item {r['item']}: "

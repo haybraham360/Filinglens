@@ -131,8 +131,17 @@ function fillSelect(sel, options, { keepFirst = false } = {}) {
   for (const [value, label] of options) sel.append(new Option(label, value));
 }
 
+/** "JPMORGAN CHASE & CO" -> "JPMorgan Chase", "Tesla, Inc." -> "Tesla" (display only). */
+const NAME_OVERRIDES = { JPM: "JPMorgan Chase", KO: "Coca-Cola", AMZN: "Amazon", NVDA: "NVIDIA", MSFT: "Microsoft", AAPL: "Apple", TSLA: "Tesla" };
+function shortName(c) {
+  if (NAME_OVERRIDES[c.ticker]) return NAME_OVERRIDES[c.ticker];
+  let n = (c.name || c.ticker).replace(/[,.]?\s+(inc|incorporated|corp|corporation|co|company|ltd|plc|llc|holdings?)\.?$/i, "").replace(/\s+&\s*co$/i, "");
+  if (n === n.toUpperCase()) n = n.toLowerCase().replace(/\b\w/g, (ch) => ch.toUpperCase());
+  return n.trim();
+}
+
 function companyOptions() {
-  return companies.map((c) => [c.ticker, `${c.ticker} · ${c.name || c.cik}`]);
+  return companies.map((c) => [c.ticker, `${c.ticker} · ${shortName(c)}`]);
 }
 
 function yearsFor(ticker) {
@@ -163,10 +172,10 @@ function renderExamples() {
   const b = pick("JPM") || a;
   const c = pick("TSLA") || a;
   const ex = [
-    [a.ticker, `What does ${a.name || a.ticker} say about supply chain risks?`],
-    [b.ticker, `What legal proceedings does ${b.name || b.ticker} disclose?`],
-    [c.ticker, `What was ${c.name || c.ticker}'s revenue and net margin?`],
-    [a.ticker, `What new risk factors did ${a.name || a.ticker} add this year?`],
+    [a.ticker, `What does ${shortName(a)} say about supply chain risks?`],
+    [b.ticker, `What legal proceedings does ${shortName(b)} disclose?`],
+    [c.ticker, `What was ${shortName(c)}'s revenue and net margin?`],
+    [a.ticker, `What new risk factors did ${shortName(a)} add this year?`],
   ];
   $("examples").innerHTML =
     '<span class="examples__label">Try:</span>' +
@@ -256,7 +265,7 @@ function renderAnswer(resp) {
     `<span class="tag tag--${esc(a.confidence)}">${esc(a.confidence)} confidence</span>`,
     lastCitations.length ? `<span class="tag">${verified}/${lastCitations.length} quotes verified</span>` : "",
     resp.cached ? '<span class="tag">cached</span>' : "",
-    `<span class="tag tag--quiet">${(resp.latency_ms / 1000).toFixed(1)} s</span>`,
+    `<span class="tag tag--quiet">${resp.latency_ms < 1000 ? `${resp.latency_ms} ms` : `${(resp.latency_ms / 1000).toFixed(1)} s`}</span>`,
   ];
   $("ansMeta").innerHTML = meta.join("");
 

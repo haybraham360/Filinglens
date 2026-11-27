@@ -369,6 +369,18 @@ def test_api_financials_compare_and_errors(api_client: Any) -> None:
     assert c.post("/ask", json=long_q).status_code == 422
 
 
+def test_vector_aggregate_converts_to_array(conn: psycopg.Connection[Any]) -> None:
+    """avg(vector) comes back as a pgvector Vector; compare's embedding score needs an array."""
+    from filinglens.api.services import vector_to_array
+
+    row = conn.execute(
+        "SELECT avg(v) FROM (VALUES ('[1,2]'::vector), ('[3,4]'::vector)) AS t(v)"
+    ).fetchone()
+    assert row is not None
+    assert vector_to_array(row[0]).tolist() == [2.0, 3.0]  # type: ignore[union-attr]
+    assert vector_to_array(None) is None
+
+
 def test_seed_export_import_roundtrip(conn: psycopg.Connection[Any], tmp_path: Path) -> None:
     from filinglens.db.seed import export_seed, import_seed
 

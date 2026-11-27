@@ -189,7 +189,7 @@ def _plan(question: str, latest: int | None = 2023) -> list[tuple[str, dict[str,
                     "search_filings",
                     {
                         "query": "What does Apple say about supply chain risk?",
-                        "top_k": 6,
+                        "top_k": 10,
                         "ticker": "AAPL",
                     },
                 )
@@ -284,3 +284,31 @@ def test_heading_words_count_for_the_sentence_below() -> None:
         QueryFilters(tickers=("BLUE",)),
     )
     assert answer.citations and answer.citations[0].quote.startswith("In June 2015")
+
+
+def test_pick_sentences_dedupes_across_years_and_prefers_recent() -> None:
+    from filinglens.rag.extractive import pick_sentences
+    from filinglens.retrieval.filters import QueryFilters
+
+    same = "We depend on a limited number of suppliers for key components of our products."
+    texts = [
+        same,  # FY2020
+        same,  # FY2021
+        "Supply disruptions at our component suppliers could delay product shipments.",  # FY2023
+        same,  # FY2024 (newest copy of the repeated sentence)
+    ]
+    years = [2020, 2021, 2023, 2024]
+    picked = pick_sentences("supplier and supply risks", texts, years, QueryFilters())
+    sentences = [s for _, s in picked]
+    assert sentences.count(same) == 1  # repeated boilerplate collapsed to one bullet
+    assert [years[i] for i, _ in picked] == [
+        2024,
+        2023,
+    ]  # kept from the newest filing, newest first
+
+
+def test_router_fetches_reported_values_asked_with_a_ratio() -> None:
+    calls = _plan("What was Apple's revenue and net margin in 2023?")
+    names = [name for name, _ in calls]
+    assert names == ["compute_ratio", "get_financials"]
+    assert calls[1][1]["concepts"] == ["revenue"]

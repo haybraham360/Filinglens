@@ -53,6 +53,13 @@ from filinglens.retrieval.retriever import RetrievalConfig, Retriever
 logger = logging.getLogger("filinglens.api")
 
 
+def vector_to_array(value: Any) -> np.ndarray | None:
+    """A pgvector result as a float array. Aggregates such as ``avg()`` return ``Vector``."""
+    if value is None:
+        return None
+    return np.asarray(value.to_numpy() if hasattr(value, "to_numpy") else value, dtype=float)
+
+
 class NotFoundError(LookupError):
     """The requested company, filing, chunk or trace doesn't exist."""
 
@@ -195,7 +202,7 @@ class Services:
                 "WHERE accession_no = %s AND item = %s AND embedding IS NOT NULL",
                 (accession_no, item),
             ).fetchone()
-            return None if row is None or row[0] is None else np.asarray(row[0], dtype=float)
+            return vector_to_array(None if row is None else row[0])
 
         def factory(registry: SourceRegistry) -> AgentContext:
             return AgentContext(
