@@ -2,7 +2,7 @@ name: Eval smoke (manual, paid)
 
 # Runs the 10-question smoke eval against a restored corpus snapshot. Manual only: it
 # makes paid Anthropic API calls. Needs the ANTHROPIC_API_KEY secret and the
-# EVAL_CORPUS_URL variable (a tarball made with `make eval-snapshot`).
+# EVAL_CORPUS_URL variable (a seed bundle made with `make seed-export`).
 on:
   workflow_dispatch:
     inputs:
@@ -41,10 +41,8 @@ jobs:
           EVAL_CORPUS_URL: ${{ vars.EVAL_CORPUS_URL }}
         run: |
           test -n "$EVAL_CORPUS_URL" || { echo "Set the EVAL_CORPUS_URL repo variable"; exit 1; }
-          curl -fsSL "$EVAL_CORPUS_URL" -o corpus.tar.gz
-          tar xzf corpus.tar.gz
-          uv run python -c "from filinglens.db.connection import connect; connect('$DATABASE_URL').close()"
-          PGPASSWORD=filinglens pg_restore -h localhost -U filinglens -d filinglens --data-only data/eval_db.dump
+          curl -fsSL "$EVAL_CORPUS_URL" -o seed.tar.gz
+          uv run filinglens seed-import seed.tar.gz
       - name: Smoke eval
         run: uv run python -m evals.run --dataset golden_v1 --split dev --config evals/configs/smoke.yaml --limit ${{ inputs.n }} --run-id ci_smoke
       - name: Compare with committed baseline

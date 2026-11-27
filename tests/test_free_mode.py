@@ -271,3 +271,16 @@ def test_router_agent_falls_back_to_template_on_bad_local_citations(tmp_path: Pa
     )
     result = _router(tmp_path, FakeWriter(bad)).run("What was Apple's gross margin in 2023?")
     assert "FY2023 44.1%" in result.answer.answer and result.answer.citation_validity == 1.0
+
+
+def test_heading_words_count_for_the_sentence_below() -> None:
+    text = (
+        "ITEM 3. LEGAL PROCEEDINGS\n\nIn June 2015, the State of Louisiana filed suit "
+        "against Bluewater and other operators alleging damage to coastal wetlands."
+    )
+    answer = extractive_answer(
+        "What legal proceedings does Bluewater face?",
+        [chunk("a", text)],
+        QueryFilters(tickers=("BLUE",)),
+    )
+    assert answer.citations and answer.citations[0].quote.startswith("In June 2015")

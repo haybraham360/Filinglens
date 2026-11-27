@@ -3,6 +3,7 @@
 Use a dedicated database: these tests delete all rows in ``chunks`` and ``filings``.
 """
 
+import json
 import os
 from collections.abc import Iterator
 from datetime import date
@@ -187,7 +188,6 @@ def test_eval_runner_retrieval_mode_against_isolated_index(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """evals.run end to end: builds eval_<fp>.chunks from parsed sections, never public.chunks."""
-    import json
 
     import evals.run as run_mod
     import yaml
@@ -277,3 +277,117 @@ def test_eval_runner_retrieval_mode_against_isolated_index(
         c.close()
     finally:
         get_settings.cache_clear()
+
+
+@pytest.fixture
+def api_client(conn: psycopg.Connection[Any], tmp_path: Path) -> Iterator[Any]:
+    """Real Services + API over the fixture corpus, free mode (no LLM)."""
+    from fastapi.testclient import TestClient
+
+    from filinglens.api.main import create_app
+    from filinglens.api.services import Services
+    from filinglens.config import Settings
+    from filinglens.db.repositories import PostgresSink
+    from filinglens.parsing.chunker import ChunkConfig
+    from filinglens.parsing.pipeline import run_parse
+    from tests.agent_fakes import CIKS, facts_frame
+    from tests.test_parsing_chunks import _setup_processed
+
+    assert URL
+    processed = _setup_processed(tmp_path)
+    run_parse(processed, ChunkConfig())
+    (tmp_path / "raw" / "universe").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "raw" / "universe" / "pilot_ciks.csv").write_text(
+        "ticker,cik,name,sector\nACME,0000999001,Acme Devices Inc,IT\n"
+        "BLUE,0000999002,Bluewater Energy Corp,Energy\nAAPL,0000320193,Apple Inc.,IT\n"
+    )
+    df = facts_frame()
+    with PostgresSink(URL) as sink:
+        sink.replace_facts(CIKS["AAPL"], df[df["cik"] == CIKS["AAPL"]])
+    settings = Settings(
+        _env_file=None,
+        database_url=URL,
+        data_dir=tmp_path,  # type: ignore[call-arg]
+        llm_provider="none",
+        api_rate_limit_per_minute=1000,
+    )
+    app = create_app(settings, services_factory=lambda s: Services(s, embedder=HashingEmbedder()))
+    with TestClient(app) as client:
+        yield client
+    conn.execute("DELETE FROM financial_facts WHERE cik = %s", (CIKS["AAPL"],))
+
+
+def test_api_end_to_end_free_mode(api_client: Any) -> None:
+    c = api_client
+    ready = c.get("/ready").json()
+    assert ready["status"] == "ok" and ready["provider"] == "none" and ready["chunks"] > 0
+    comps = {x["ticker"]: x for x in c.get("/companies").json()}
+    assert comps["ACME"]["years_10k"] == [2023] and comps["ACME"]["years_10q"] == [2024]
+    assert comps["BLUE"]["name"] == "Bluewater Energy Corp"
+
+    r = c.post("/ask", json={"question": "What legal proceedings does Bluewater face?"})
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["tools_called"] == ["search_filings"] and not body["cached"]
+    cite = body["answer"]["citations"][0]
+    assert cite["verified"] and "Louisiana" in cite["quote"] and cite["ticker"] == "BLUE"
+    assert r.headers["X-Trace-ID"] == body["trace_id"]
+
+    src = c.get(f"/filings/{cite['accession_no']}/chunk/{cite['chunk_id']}").json()
+    assert cite["quote"] in src["text"] and src["filing_url"].startswith("https://www.sec.gov/")
+    span = c.get(
+        f"/filings/{cite['accession_no']}/section/{cite['item']}", params={"start": 0, "end": 40}
+    ).json()
+    assert span["text"].startswith("ITEM 3")
+
+    trace = c.get(f"/traces/{body['trace_id']}").json()
+    assert trace["payload"]["steps"][0]["name"] == "search_filings"
+    again = c.post("/ask", json={"question": "what legal proceedings does  BLUEWATER face?"}).json()
+    assert again["cached"] and again["trace_id"] == body["trace_id"]
+
+    rag = c.post(
+        "/ask", json={"question": "Acme semiconductor shortages", "mode": "rag", "ticker": "ACME"}
+    ).json()
+    assert rag["mode"] == "rag" and rag["answer"]["citations"]
+    assert {x["ticker"] for x in rag["answer"]["citations"]} == {"ACME"}
+
+
+def test_api_financials_compare_and_errors(api_client: Any) -> None:
+    c = api_client
+    fin = c.get("/financials/AAPL").json()
+    assert fin["years"] == [2021, 2022, 2023]
+    rows = {r["metric"]: r for r in fin["rows"]}
+    assert rows["gross_margin"]["values"]["2023"] == "0.441311"
+    assert rows["revenue"]["values"]["2023"] == "383285000000.0"
+    assert rows["net_income"]["values"]["2022"] == "99803000000.0"  # as originally filed
+    r = c.post("/compare", json={"ticker": "BLUE", "item": "1A"})
+    assert r.status_code == 404 and "available years" in r.json()["detail"]
+    assert c.get("/financials/ZZZZ").status_code == 404
+    assert c.get("/traces/nope").status_code == 404
+    assert c.get("/filings/x/section/1A", params={"start": 0, "end": 5}).status_code == 404
+    long_q = {"question": "x" * 600}
+    assert c.post("/ask", json=long_q).status_code == 422
+
+
+def test_seed_export_import_roundtrip(conn: psycopg.Connection[Any], tmp_path: Path) -> None:
+    from filinglens.db.seed import export_seed, import_seed
+
+    assert URL
+    (tmp_path / "src" / "processed" / "sections" / "x").mkdir(parents=True)
+    (tmp_path / "src" / "processed" / "sections" / "x" / "a.parquet").write_bytes(b"pq")
+    before = {
+        t: conn.execute(f"SELECT count(*) FROM {t}").fetchone() for t in ("filings", "chunks")
+    }
+    manifest = export_seed(conn, tmp_path / "src", tmp_path / "seed.tar.gz")
+    assert manifest["tables"]["chunks"] == before["chunks"][0]  # type: ignore[index]
+    with pytest.raises(RuntimeError, match="already have data"):
+        import_seed(conn, tmp_path / "seed.tar.gz", tmp_path / "dst")
+    out = import_seed(conn, tmp_path / "seed.tar.gz", tmp_path / "dst", replace=True)
+    assert out["tables_loaded"] and out["imported"]["chunks"] == before["chunks"][0]  # type: ignore[index]
+    assert (tmp_path / "dst" / "processed" / "sections" / "x" / "a.parquet").read_bytes() == b"pq"
+    n = conn.execute("SELECT count(*) FROM chunks WHERE embedding IS NOT NULL").fetchone()
+    assert n == before["chunks"]  # embeddings survive the round trip
+    (tmp_path / "dst2").mkdir()
+    out = import_seed(conn, tmp_path / "seed.tar.gz", tmp_path / "dst2", if_empty=True)
+    assert not out["tables_loaded"]  # DB not empty: data files only
+    assert (tmp_path / "dst2" / "processed" / "sections" / "x" / "a.parquet").exists()

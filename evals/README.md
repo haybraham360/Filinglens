@@ -86,7 +86,7 @@ The free configs skip the judge, so correctness and faithfulness aren't scored. 
 
 ## CI
 
-Every PR runs the offline harness tests (`tests/test_evals.py`): metric math, oracle/null runs, failure classes, resume and the judge rubric. The paid 10-question smoke eval is a manual workflow (`.github/workflows/eval-smoke.yml`). It needs the `ANTHROPIC_API_KEY` secret and the `EVAL_CORPUS_URL` variable, which points to a tarball made with `make eval-snapshot`.
+Every PR runs the offline harness tests (`tests/test_evals.py`): metric math, oracle/null runs, failure classes, resume and the judge rubric. The paid 10-question smoke eval is a manual workflow (`.github/workflows/eval-smoke.yml`). It needs the `ANTHROPIC_API_KEY` secret and the `EVAL_CORPUS_URL` variable, which points to a tarball made with `make seed-export`.
 
 ## FinanceBench
 

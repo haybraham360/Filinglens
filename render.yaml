@@ -1,0 +1,39 @@
+# Option A: Render Blueprint (New > Blueprint, point it at this repo).
+# Before the first deploy: run `make seed-export` locally, upload seed.tar.gz somewhere
+# downloadable (e.g. a GitHub release asset), and set SEED_URL on the api service. The API
+# loads it on boot (tables only when empty). Check Render's current plans and limits; the
+# API needs ~400 MB RAM (ONNX embeddings, no PyTorch).
+databases:
+  - name: filinglens-db
+    databaseName: filinglens
+    user: filinglens
+    postgresMajorVersion: "16"
+
+services:
+  - type: web
+    name: filinglens-api
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase: {name: filinglens-db, property: connectionString}
+      - key: LLM_PROVIDER
+        value: none            # free: extractive answers + rule-based tools
+      - key: API_TRUST_PROXY
+        value: "true"
+      - key: SEED_URL
+        sync: false            # set in the dashboard
+      - key: ANTHROPIC_API_KEY
+        sync: false            # optional; leave empty for the free mode
+      - key: LLM_DAILY_SPEND_CAP_USD
+        value: "2"
+
+  - type: web
+    name: filinglens-frontend
+    runtime: docker
+    dockerfilePath: ./docker/frontend.Dockerfile
+    healthCheckPath: /_stcore/health
+    envVars:
+      - key: FILINGLENS_API_URL
+        sync: false            # set to the API's URL, e.g. https://filinglens-api.onrender.com

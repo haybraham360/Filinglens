@@ -254,8 +254,8 @@ class RouterAgent:
         self.prompt = load_prompt("router_writer")
         self.trace_log = trace_log
 
-    def run(self, question: str) -> AgentResult:
-        """Plan with rules, run the tools, write the answer."""
+    def run(self, question: str, on_step: Callable[[Step], None] | None = None) -> AgentResult:
+        """Plan with rules, run the tools, write the answer (``on_step`` reports progress)."""
         trace_id = uuid.uuid4().hex
         start = time.perf_counter()
         registry = SourceRegistry()
@@ -268,7 +268,9 @@ class RouterAgent:
             years = ctx.sections.available_years(filters.ciks[0], "7")
             return years[-1] if years else None
 
-        steps: list[Step] = []
+        from filinglens.agent.loop import _NotifyingList
+
+        steps: list[Step] = _NotifyingList(on_step)
         results: list[tuple[PlannedCall, dict[str, Any], bool]] = []
         for call in plan(question, filters, latest_year):
             t0 = time.perf_counter()

@@ -51,6 +51,7 @@ class Settings(BaseSettings):
     # Embeddings
     embedding_model: str = "BAAI/bge-small-en-v1.5"
     embedding_dim: int = Field(default=384, gt=0)
+    embedding_backend: Literal["fastembed", "sentence-transformers"] = "fastembed"
 
     # Retrieval (specs/03; eval-tunable)
     retrieval_top_k: int = Field(default=8, gt=0)
@@ -63,6 +64,15 @@ class Settings(BaseSettings):
 
     # API
     api_cors_origins: Annotated[list[str], NoDecode] = ["http://localhost:8501"]
+    api_rate_limit_per_minute: int = Field(default=12, gt=0)
+    api_rate_limit_high_per_minute: int = Field(default=3, gt=0)
+    api_rate_limit_other_per_minute: int = Field(default=120, gt=0)
+    api_trust_proxy: bool = False  # use X-Forwarded-For (only behind a proxy you control)
+    api_cache_ttl_s: int = Field(default=86_400, ge=0)
+    api_max_question_chars: int = Field(default=500, gt=10)
+    db_pool_size: int = Field(default=5, gt=0)
+    # Cheaper Claude model for the public demo; "high" quality uses LLM_MODEL.
+    demo_llm_model: str = "claude-haiku-5-5"
 
     @field_validator("anthropic_api_key", mode="before")
     @classmethod

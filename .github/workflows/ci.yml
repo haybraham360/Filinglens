@@ -45,3 +45,44 @@ jobs:
           cache-dependency-path: frontend/landing/package-lock.json
       - run: npm ci
       - run: npm run build
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Build API image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile
+          push: false
+          tags: filinglens-api:ci
+          cache-from: type=gha,scope=api
+          cache-to: type=gha,scope=api,mode=max
+      - name: Build frontend image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/frontend.Dockerfile
+          push: false
+          tags: filinglens-frontend:ci
+          cache-from: type=gha,scope=frontend
+          cache-to: type=gha,scope=frontend,mode=max
+
+  deploy:
+    # Deploy on merge to main, only once a deploy hook is configured (Render: Settings >
+    # Deploy Hook; add it as the RENDER_DEPLOY_HOOK_URL secret, one per service if needed).
+    needs: [python, docker, secrets]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    env:
+      HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+      HOOK_FRONTEND: ${{ secrets.RENDER_DEPLOY_HOOK_URL_FRONTEND }}
+    steps:
+      - name: Trigger deploy
+        run: |
+          if [ -z "$HOOK" ]; then echo "No deploy hook configured; skipping."; exit 0; fi
+          curl -fsS -X POST "$HOOK" > /dev/null
+          if [ -n "$HOOK_FRONTEND" ]; then curl -fsS -X POST "$HOOK_FRONTEND" > /dev/null; fi
+          echo "Deploy triggered."
