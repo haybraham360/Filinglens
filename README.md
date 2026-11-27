@@ -45,6 +45,7 @@ make frontend                 # http://localhost:8501
 | `make up` | db, api and frontend in Docker |
 | `make experiments` / `make eval-free` | Free evals (see `evals/README.md`) |
 | `make loadtest` | 20 concurrent `/ask` requests against a running API |
+| `make research-synthetic` | Lazy Prices pipeline check on simulated data (see `research_report.md`) |
 | `make seed-export` | Bundle the ingested corpus for a deployment (see `deploy/README.md`) |
 | `make check` | Lint, type-check and test |
 | `npm run dev` | Landing page on http://localhost:5173 |
@@ -77,5 +78,9 @@ deploy/            production compose + Caddy (VPS); render.yaml at the root (Re
 loadtest/          concurrent /ask load test
 tests/
 ```
+
+## Research: Lazy Prices
+
+`filinglens research` replicates Cohen, Malloy & Nguyen (2020). It computes year-over-year 10-K similarity (the paper's four measures, plus embedding, risk-factor and tone changes) and builds quintile portfolios with no lookahead. It then runs factor regressions with Newey-West t-stats, robustness checks including pre- and post-2014, and Fama-MacBeth. Every variant tried is logged. The method, the safeguards and how to run it on real data are in [`research_report.md`](research_report.md). No real-data results yet.
 
 Data from SEC EDGAR. Not investment advice.

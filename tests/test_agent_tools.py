@@ -3,6 +3,7 @@ from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
+import numpy as np
 import pandas as pd
 import pytest
 
@@ -16,7 +17,15 @@ from filinglens.parsing.blocks import Block
 from filinglens.parsing.chunker import FilingInfo
 from filinglens.parsing.pipeline import sections_frame
 from filinglens.parsing.sections import Section
-from filinglens.research.similarity import all_measures, cosine_tf, jaccard, min_edit, simple
+from filinglens.research.similarity import (
+    all_measures,
+    change_ratio,
+    cosine_tf,
+    feature_scale_simple,
+    jaccard,
+    min_edit,
+    simple,
+)
 from filinglens.retrieval.embedder import HashingEmbedder
 from filinglens.retrieval.filters import CompanyDirectory, QueryFilters
 from filinglens.retrieval.retriever import RetrievalResult
@@ -316,8 +325,20 @@ def test_similarity_measures_bounds_and_known_values() -> None:
     a, b = ["the", "cat", "sat"], ["the", "cat", "ran"]
     assert jaccard(a, b) == pytest.approx(2 / 4)
     assert cosine_tf(a, b) == pytest.approx(2 / 3)
-    assert min_edit(a, b) == pytest.approx(1 - 1 / 3)
-    assert simple(a, b) == pytest.approx(1 - 2 / 6)
+    assert min_edit(a, b) == pytest.approx(1 - 2 / 6)  # a substitution = delete + insert
+    # the paper's example: D_A -> D_B adds one word; D_A -> D_C deletes 3 and adds 3
+    da = ["we", "expect", "demand", "to", "increase"]
+    assert min_edit(da, ["we", "expect", "worldwide", "demand", "to", "increase"]) == pytest.approx(
+        1 - 1 / 11
+    )
+    assert min_edit(da, ["we", "expect", "weakness", "in", "sales"]) == pytest.approx(1 - 6 / 10)
+    # simple works on lines: every word in a changed line counts as changed
+    old = [["risk", "one"], ["risk", "two", "here"]]
+    new = [["risk", "one"], ["risk", "two", "there"]]
+    assert change_ratio(old, new) == pytest.approx(6 / 10)
+    assert simple(old, new) == pytest.approx(1 - 6 / 10)
+    scaled = feature_scale_simple(np.array([0.0, 0.3, 0.6]), c_max=0.6)
+    assert scaled.tolist() == pytest.approx([1.0, 0.5, 0.0])
     same = all_measures("Risk factors apply.", "Risk factors apply.")
     assert set(same.values()) == {1.0}
     assert all_measures("alpha beta", "gamma delta") == {

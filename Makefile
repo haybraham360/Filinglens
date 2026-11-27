@@ -1,4 +1,4 @@
-.PHONY: setup up down db api frontend landing loadtest prod-up ingest parse embed eval eval-free eval-offline experiments seed-export test-db test lint typecheck check
+.PHONY: setup up down db api frontend landing loadtest prod-up ingest parse embed eval eval-free eval-offline experiments research-synthetic research seed-export test-db test lint typecheck check
 
 setup:        ## Install Python deps (all extras) and landing page deps
 	uv sync --all-extras
@@ -52,6 +52,15 @@ eval-offline: ## Harness checks with oracle and null systems (free)
 
 experiments:  ## Retrieval experiments E1-E6 on the test split (free: no LLM calls)
 	uv run python -m evals.experiments --split test
+
+research-synthetic: ## Lazy Prices pipeline check on simulated data (free, ~30 s)
+	uv run filinglens research backtest --synthetic
+
+research:     ## Lazy Prices on real data: signals -> prices -> factors -> backtest (see research_report.md)
+	uv run filinglens research signals
+	uv run filinglens research prices
+	uv run filinglens research factors
+	uv run filinglens research backtest
 
 seed-export:  ## Bundle the ingested corpus for a deployment or the CI smoke eval
 	uv run filinglens seed-export --out seed.tar.gz

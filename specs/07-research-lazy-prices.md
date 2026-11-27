@@ -57,15 +57,47 @@ An LLM may *know* what happened to a company after the filing (e.g. bankruptcy),
 - Discuss this in the write-up. It's a sophisticated point reviewers will appreciate.
 
 ## Other bias checklist
-- [ ] Lookahead: signal uses only data up to the acceptance timestamp; entry in the following month
-- [ ] Quintile breakpoints from the prior year only
-- [ ] Survivorship bias disclosed, with its direction discussed
-- [ ] No parameter tuning on the post-2014 test period
-- [ ] Amendments (10-K/A) excluded
-- [ ] Multiple-testing awareness: report all variants tried, not only the best
+- [x] Lookahead: signal uses only data up to the acceptance timestamp; entry in the following month (release month on EDGAR's Eastern clock; tested)
+- [x] Quintile breakpoints from the prior year only (tested: current-year values can't move them)
+- [x] Survivorship bias disclosed, with its direction discussed (printed automatically for non-CRSP data)
+- [x] No parameter tuning on the post-2014 test period (grid fixed in `config/research.yaml`)
+- [x] Amendments (10-K/A) excluded
+- [x] Multiple-testing awareness: report all variants tried, not only the best (`variants.csv`, plus a count in the report)
 
 ## Deliverables
 - `src/filinglens/research/similarity.py` (shared with the product)
 - `notebooks/research/01_signals.ipynb`, `02_portfolios.ipynb`, `03_regressions.ipynb`
 - `research_report.md`: question, data, method, results tables, limitations, conclusion. This can become the capstone write-up.
 - A chart of cumulative L/S returns, with a pre/post-2014 split marker.
+
+## As built
+Code is in `src/filinglens/research/`, the CLI is `filinglens research ...`, and the write-up is `research_report.md`.
+
+**Definitions checked against the paper (NBER w25084, pp. 12-16):**
+- Cosine (raw TF) and Jaccard (sets) match exactly.
+- **MinEdit** counts a replaced word as a deletion plus an insertion, as in the paper's example. The paper gives no normalization, so ours is `/(len_a + len_b)`.
+- **Simple** is a *line*-level `diff` that counts the words in changed lines. The paper's feature scaling `(c_max - c)/c_max` is affine, so we store `1 - c` (same ranks).
+- The paper's "5-factor" model is **FF3 + momentum + liquidity**, not FF5. We run both.
+- The paper is inconsistent about breakpoints: the text says "prior month's distribution", while the tables say "prior year's". Prior year is the default, and a trailing-12-month variant is reported.
+
+**Modules:**
+- `similarity.py`: the four measures.
+- `signals.py`: pairs each filing with the one a year earlier (300-430 days back; 10-Q to the same quarter) and computes the classical, embedding, risk-heading, LM-tone and CEO/CFO-change features per section. Cached incrementally in `data/processed/research/signals.parquet`.
+- `prices.py`: CRSP loader (delisting returns compounded, share codes 10/11, CIK-PERMNO link) or yfinance with XBRL shares. Point-in-time book equity. Momentum and size controls with gap handling.
+- `factors.py`: Ken French CSVs and the Pastor-Stambaugh file (layout-based parsers, not yet checked against a live download because the development sandbox couldn't reach the host).
+- `portfolios.py`: prior-year breakpoints, entry at m+1, holding windows where the newest filing wins, EW and lagged-ME VW, turnover and net-of-cost L/S.
+- `regressions.py`: Newey-West alphas, Sharpe ratios, Fama-MacBeth with monthly winsorizing.
+- `backtest.py`: the pre-registered grid; every variant is logged.
+- `report.py`: markdown tables in the paper's layout, a variants CSV, and a cumulative L/S chart with the 2015 split.
+- `llm_severity.py`: anonymization plus a training-cutoff gate (prompt `change_severity_v1`).
+- `synthetic.py`: a world with a planted effect, used for validation.
+
+**Notebooks:** `notebooks/research/01_signals`, `02_portfolios` and `03_regressions` are thin views over `src/`. They fall back to the synthetic world when no data exists.
+
+**Validation:** `tests/test_research.py` covers pairing, Eastern-clock release months, breakpoint isolation, entry timing, lagged value weights, release-month returns not being captured, recovery of a planted effect, NW and Fama-MacBeth recovery, point-in-time facts, CRSP delisting, the parsers, anonymization and the LLM cutoff gate.
+
+## Status
+- [x] Pipeline, tests, notebooks, report generator, write-up skeleton
+- [ ] WRDS/CRSP access: ask WorldQuant University (otherwise run with yfinance and state the bias)
+- [ ] Broad-universe ingest (≈1,000 firms × 2008–2024). Needs roughly 20+ GB for raw HTML, more than the dev machine has free
+- [ ] Real-data run; fill in `research_report.md` §6
