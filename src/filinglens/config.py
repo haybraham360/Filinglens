@@ -64,6 +64,8 @@ class Settings(BaseSettings):
 
     # API
     api_cors_origins: Annotated[list[str], NoDecode] = ["http://localhost:8501"]
+    # Extra allowed origins as one regex, e.g. Vercel preview deployments of the frontend.
+    api_cors_origin_regex: str | None = None
     api_rate_limit_per_minute: int = Field(default=12, gt=0)
     api_rate_limit_high_per_minute: int = Field(default=3, gt=0)
     api_rate_limit_other_per_minute: int = Field(default=120, gt=0)
@@ -74,7 +76,7 @@ class Settings(BaseSettings):
     # Cheaper Claude model for the public demo; "high" quality uses LLM_MODEL.
     demo_llm_model: str = "claude-haiku-5-5"
 
-    @field_validator("anthropic_api_key", mode="before")
+    @field_validator("anthropic_api_key", "api_cors_origin_regex", mode="before")
     @classmethod
     def _blank_key_is_none(cls, value: object) -> object:
         """``ANTHROPIC_API_KEY=`` (empty, as in .env.example) means no key."""

@@ -79,6 +79,7 @@ def create_app(
     api.add_middleware(
         CORSMiddleware,
         allow_origins=settings.api_cors_origins,
+        allow_origin_regex=settings.api_cors_origin_regex,
         allow_methods=["GET", "POST"],
         allow_headers=["Content-Type", "X-Request-ID"],
         expose_headers=["X-Request-ID", "X-Trace-ID"],

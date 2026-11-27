@@ -179,6 +179,24 @@ def test_cors_restricted_to_configured_origin() -> None:
         assert "access-control-allow-origin" not in bad.headers
 
 
+def test_cors_origin_regex_allows_preview_deployments() -> None:
+    regex = r"^https://filinglens-[a-z0-9]+-team\.vercel\.app$"
+    with client(api_cors_origins=["https://app.example"], api_cors_origin_regex=regex) as c:
+
+        def allowed(origin: str) -> str | None:
+            r = c.options(
+                "/ask", headers={"Origin": origin, "Access-Control-Request-Method": "POST"}
+            )
+            return r.headers.get("access-control-allow-origin")
+
+        assert (
+            allowed("https://filinglens-abc123-team.vercel.app")
+            == "https://filinglens-abc123-team.vercel.app"
+        )
+        assert allowed("https://app.example") == "https://app.example"
+        assert allowed("https://filinglens-abc123-team.vercel.app.evil.com") is None
+
+
 def test_proxy_header_only_trusted_when_configured() -> None:
     with client(api_rate_limit_per_minute=1) as c:
         h = {"X-Forwarded-For": "1.1.1.1"}

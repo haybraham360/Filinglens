@@ -28,7 +28,12 @@ Two Vercel projects:
 1. **Database:** `vercel install neon` in the API project. This sets `DATABASE_URL` (pooled). The API turns off server-side prepared statements, so it works through Neon's pooler.
 2. **Data:** ingest, parse and embed locally, run `make seed-export`, then load the tables into Neon with `DATABASE_URL=<Neon URL> filinglens seed-import seed.tar.gz --replace`. Upload `seed.tar.gz` as the `seed-v1` GitHub release asset. `Dockerfile.vercel` bakes its section files into the image at build time.
 3. **API settings** (production): `LLM_PROVIDER=none`, `API_CORS_ORIGINS=<landing URLs>`, `API_TRUST_PROXY=true` (Vercel sets `X-Forwarded-For`), `PORT=8000`, `DB_POOL_SIZE=3`.
-4. **Deploy:** `vercel deploy --prod` at the repo root (API), then in `frontend/landing` with `VITE_API_URL` set to the API's URL.
+4. **Deploy: automatic from GitHub.** Both projects are connected to the repo.
+   - A push to `main` deploys to production.
+   - Pushes to other branches and pull requests get preview deployments.
+   - Each project skips the build when a push doesn't touch its files: the `ignoreCommand` in `vercel.json` checks `src/`, `pyproject.toml`, `uv.lock`, `Dockerfile.vercel` and `config/` for the API, and `frontend/landing/` for the site.
+   - Preview frontends can call the API because `API_CORS_ORIGIN_REGEX` admits this team's `*.vercel.app` preview URLs.
+   - Preview deployments use the same Neon database as production.
 
 Notes:
 - **Limits are per instance.** The rate limiter and answer cache live in memory, so under heavy traffic Vercel's extra instances each keep their own.
