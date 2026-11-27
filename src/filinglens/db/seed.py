@@ -109,6 +109,20 @@ def export_seed(conn: psycopg.Connection[Any], data_dir: Path, out: Path) -> dic
     return manifest
 
 
+def extract_files(bundle: Path, data_dir: Path) -> dict[str, Any]:
+    """Unpack only the bundle's data files (parsed sections, universe) into ``data_dir``.
+
+    Needs no database, so image builds can bake the files in. Returns the manifest.
+    """
+    with tarfile.open(bundle, "r:gz") as tar:
+        manifest: dict[str, Any] = json.loads(_read(tar, "manifest.json"))
+        members = [m for m in tar.getmembers() if m.name.startswith("data/")]
+        for m in members:
+            m.name = m.name.removeprefix("data/")
+        tar.extractall(data_dir, members=members, filter="data")  # blocks path traversal
+    return manifest
+
+
 def import_seed(
     conn: psycopg.Connection[Any],
     bundle: Path,
@@ -132,12 +146,8 @@ def import_seed(
     load_tables = not (if_empty and non_empty)
     if non_empty and not replace and not if_empty:
         raise RuntimeError(f"Tables already have data: {non_empty}. Pass --replace to overwrite.")
+    manifest = extract_files(bundle, data_dir)
     with tarfile.open(bundle, "r:gz") as tar:
-        manifest: dict[str, Any] = json.loads(_read(tar, "manifest.json"))
-        members = [m for m in tar.getmembers() if m.name.startswith("data/")]
-        for m in members:
-            m.name = m.name.removeprefix("data/")
-        tar.extractall(data_dir, members=members, filter="data")  # blocks path traversal
         if load_tables:
             with conn.transaction():
                 conn.execute("TRUNCATE chunks, financial_facts, filings")

@@ -31,6 +31,9 @@ def seed_import(
     if_empty: bool = typer.Option(
         False, help="Always extract data files; load tables only if the database is empty."
     ),
+    files_only: bool = typer.Option(
+        False, help="Only extract the data files (no database), e.g. during an image build."
+    ),
 ) -> None:
     """Load a seed bundle into DATABASE_URL and DATA_DIR."""
     import tempfile
@@ -52,6 +55,14 @@ def seed_import(
     if bundle is None or not bundle.exists():
         typer.secho("Give a bundle path or --url.", fg=typer.colors.RED, err=True)
         raise typer.Exit(code=2)
+    if files_only:
+        from filinglens.db.seed import extract_files
+
+        manifest = extract_files(bundle, settings.data_dir)
+        typer.echo(
+            f"Extracted data files to {settings.data_dir} (bundle {manifest.get('filinglens')})."
+        )
+        return
     with connect(settings.database_url) as conn:
         try:
             manifest = import_seed(

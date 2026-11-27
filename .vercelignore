@@ -1,0 +1,9 @@
+# The filinglens-api Vercel project builds Dockerfile.vercel: upload only what it needs.
+/*
+!Dockerfile.vercel
+!.dockerignore
+!pyproject.toml
+!uv.lock
+!README.md
+!src
+!config

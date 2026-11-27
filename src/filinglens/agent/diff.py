@@ -94,11 +94,10 @@ def align(old: list[Unit], new: list[Unit], embedder: Embedder | None = None) ->
 
     # 2) greedy matching on fuzzy (+ embedding) score
     if old_left and new_left:
+        norm_old = {i: _norm(old[i].text) for i in old_left}
+        norm_new = {j: _norm(new[j].text) for j in new_left}
         fuzzy = np.array(
-            [
-                [fuzz.ratio(_norm(old[i].text), _norm(new[j].text)) / 100 for j in new_left]
-                for i in old_left
-            ]
+            [[fuzz.ratio(norm_old[i], norm_new[j]) / 100 for j in new_left] for i in old_left]
         )
         score = fuzzy
         if embedder is not None:

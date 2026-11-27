@@ -12,6 +12,7 @@ from contextlib import contextmanager
 from dataclasses import asdict
 from typing import Any
 
+import numpy as np
 import psycopg
 from pgvector.psycopg import register_vector
 from psycopg.types.json import Jsonb
@@ -90,7 +91,9 @@ class Services:
             settings.database_url,
             min_size=1,
             max_size=settings.db_pool_size,
-            kwargs={"autocommit": True},
+            # prepare_threshold=None: no server-side prepared statements, so the pool also works
+            # through transaction-mode poolers (Neon, PgBouncer) used by serverless hosts
+            kwargs={"autocommit": True, "prepare_threshold": None},
             configure=register_vector,
             open=True,
         )
@@ -185,6 +188,15 @@ class Services:
         facts = PostgresFactStore(conn)
         concept_map = str(self.settings.universe_file.parent / "concept_map.yaml")
 
+        def section_vector(accession_no: str, item: str) -> np.ndarray | None:
+            # mean of the chunk embeddings already stored for this filing's Item
+            row = conn.execute(
+                "SELECT avg(embedding) FROM chunks "
+                "WHERE accession_no = %s AND item = %s AND embedding IS NOT NULL",
+                (accession_no, item),
+            ).fetchone()
+            return None if row is None or row[0] is None else np.asarray(row[0], dtype=float)
+
         def factory(registry: SourceRegistry) -> AgentContext:
             return AgentContext(
                 retriever=retriever,
@@ -194,6 +206,7 @@ class Services:
                 registry=registry,
                 embedder=self.embedder,
                 concept_map_path=concept_map,
+                section_vector=section_vector,
             )
 
         return factory

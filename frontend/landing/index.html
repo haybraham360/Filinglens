@@ -32,7 +32,7 @@
           <li><a href="#research">Research</a></li>
         </ul>
       </nav>
-      <a class="btn btn--small" href="#demo">Ask a question</a>
+      <a class="btn btn--small" href="/app">Open the app</a>
     </div>
   </header>
 
@@ -44,11 +44,11 @@
           <h1 class="hero__title">Ask the filing.<br/>See the sentence that answers it.</h1>
           <p class="hero__lede">FilingLens reads 10-K and 10-Q filings from SEC EDGAR, answers your questions with quotes you can check, shows what a company changed since last year, and takes every number from reported XBRL data instead of letting a model guess.</p>
           <div class="hero__ctas">
-            <a class="btn" href="#demo">Try the demo</a>
-            <a class="btn btn--ghost" href="#changes">See a year-over-year diff</a>
+            <a class="btn" href="/app">Ask a real filing</a>
+            <a class="btn btn--ghost" href="/app#diff">See what changed this year</a>
           </div>
           <ul class="hero__facts">
-            <li><strong>20</strong> pilot companies, five years of filings</li>
+            <li><strong>Real 10-Ks</strong> from large US companies, straight from SEC EDGAR</li>
             <li><strong>Every answer</strong> cites a filing, an Item and a quote</li>
           </ul>
         </div>
@@ -57,7 +57,7 @@
           <div class="demo__bar">
             <span class="demo__dots" aria-hidden="true"><i></i><i></i><i></i></span>
             <span class="demo__title">HALV &nbsp;10-K &nbsp;FY2024</span>
-            <span class="demo__tag">Fictional company</span>
+            <span class="demo__tag">Example · fictional company</span>
           </div>
           <div class="demo__body">
             <div class="demo__chat">
@@ -241,7 +241,7 @@
         <ol class="method">
           <li><h3>Score each 10-K against the last one</h3><p>Classical and embedding similarity, new and removed risk headings, and the change in negative-word share. Timestamped at SEC acceptance.</p></li>
           <li><h3>Sort into quintiles</h3><p>Breakpoints come from the prior year only. A stock enters its portfolio the month after its filing.</p></li>
-          <li><h3>Hold and rebalance</h3><p>3, 6 and 12 month holding periods with overlapping cohorts, equal and value weighted.</p></li>
+          <li><h3>Hold and rebalance</h3><p>3, 6 and 12 month holding periods, rebalanced monthly, equal and value weighted.</p></li>
           <li><h3>Test the alpha</h3><p>Fama–French 3 and 5 factor plus momentum regressions with Newey–West errors. Every variant tried is reported, not only the best.</p></li>
         </ol>
       </div>
@@ -251,7 +251,7 @@
     <section class="cta">
       <div class="wrap cta__inner">
         <h2 class="cta__title">Ask a question you’d normally spend an afternoon on.</h2>
-        <a class="btn btn--light" href="#demo">Try the demo</a>
+        <a class="btn btn--light" href="/app">Open the app</a>
       </div>
     </section>
   </main>
@@ -263,6 +263,6 @@
     </div>
   </footer>
 
-  <script src="app.js"></script>
+  <script type="module" src="./app.js"></script>
 </body>
 </html>

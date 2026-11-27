@@ -41,3 +41,6 @@ node_modules/
 
 # Research pipeline check output (regenerate with `make research-synthetic`)
 reports/research/synthetic/
+.vercel
+.env*
+!.env.example

@@ -318,6 +318,35 @@ def test_compare_sections_tool_defaults_to_latest_two_years(tmp_path: Path) -> N
     assert is_error and "available years: [2022, 2023]" in err["error"]
 
 
+def test_compare_uses_stored_section_vectors_and_never_reembeds(tmp_path: Path) -> None:
+    """With a database hook, embedding similarity comes from stored vectors (fast)."""
+    cik = "0000999001"
+    _write_sections(tmp_path, cik, "ACME", "0000999001-22-000001", 2022, _section("1A", OLD_1A))
+    _write_sections(tmp_path, cik, "ACME", "0000999001-23-000001", 2023, _section("1A", NEW_1A))
+    ctx = make_ctx(tmp_path, SectionStore(tmp_path))
+    vectors = {
+        "0000999001-22-000001": np.array([1.0, 0.0]),
+        "0000999001-23-000001": np.array([0.6, 0.8]),
+    }
+    ctx.section_vector = lambda acc, item: vectors.get(acc)
+    out, is_error = run_tool(ctx, "compare_sections", {"ticker": "ACME", "item": "1A"})
+    assert not is_error, out
+    assert out["similarity"]["embedding_cosine"] == pytest.approx(0.6)
+    assert out["counts"]["paragraphs_modified"] == 1  # fuzzy paragraph alignment still finds it
+
+    # a filing that isn't embedded yet: the score is omitted, nothing is embedded per request
+    class Boom(HashingEmbedder):
+        def embed_documents(self, texts):  # type: ignore[no-untyped-def,override]
+            assert len(texts) < 10, "sections must not be re-embedded inside the API"
+            return super().embed_documents(texts)
+
+    ctx = make_ctx(tmp_path, SectionStore(tmp_path))
+    ctx.embedder = Boom()
+    ctx.section_vector = lambda acc, item: None
+    out, _ = run_tool(ctx, "compare_sections", {"ticker": "ACME", "item": "1A"})
+    assert out["similarity"]["embedding_cosine"] is None
+
+
 # --- similarity ---------------------------------------------------------------------------
 
 

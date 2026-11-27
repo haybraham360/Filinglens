@@ -11,12 +11,14 @@ from dataclasses import dataclass
 from typing import Any, Literal
 
 import anthropic
+import numpy as np
 from pydantic import BaseModel, Field, ValidationError
 
 from filinglens.agent.diff import SectionStore, align, section_similarity, units
 from filinglens.agent.financials import FactStore, get_financials, load_concept_map
 from filinglens.agent.ratios import RATIOS, compute
 from filinglens.agent.sources import SourceRegistry
+from filinglens.research.similarity import embedding_cosine
 from filinglens.retrieval.embedder import Embedder
 from filinglens.retrieval.filters import CompanyDirectory, QueryFilters
 from filinglens.retrieval.retriever import Retriever
@@ -40,6 +42,9 @@ class AgentContext:
     registry: SourceRegistry
     embedder: Embedder | None = None
     concept_map_path: str = "config/concept_map.yaml"
+    # Mean stored embedding of one filing's Item (accession, item) -> vector, if available.
+    # Lets compare_sections report embedding similarity without re-embedding whole sections.
+    section_vector: Callable[[str, str], np.ndarray | None] | None = None
 
     def cik(self, ticker: str) -> str:
         """Resolve a ticker (or a company name) to a CIK, or raise a helpful error."""
@@ -167,10 +172,20 @@ def compare_sections(ctx: AgentContext, args: CompareSectionsArgs) -> dict[str, 
         raise ToolError(f"No 10-K Item {item} for FY{missing}; available years: {years}.")
     (ref_a, sec_a), (ref_b, sec_b) = got_a, got_b
 
-    paragraphs = align(
-        units(sec_a, ("para", "table")), units(sec_b, ("para", "table")), ctx.embedder
-    )
+    # Paragraphs: fuzzy text alignment only. Embedding hundreds of long paragraphs per
+    # request is far too slow for an interactive API, and fuzzy matching is deterministic.
+    # Headings are short and few, so they keep the embedding-assisted alignment.
+    paragraphs = align(units(sec_a, ("para", "table")), units(sec_b, ("para", "table")))
     headings = align(units(sec_a, ("heading",)), units(sec_b, ("heading",)), ctx.embedder)
+    similarity = section_similarity(sec_a, sec_b, None)
+    if ctx.section_vector is not None:
+        # stored chunk embeddings; if a filing isn't embedded yet the score is just omitted
+        va = ctx.section_vector(ref_a.accession_no, ref_a.item)
+        vb = ctx.section_vector(ref_b.accession_no, ref_b.item)
+        if va is not None and vb is not None:
+            similarity["embedding_cosine"] = round(embedding_cosine(va, vb), 4)
+    elif ctx.embedder is not None:  # no database (CLI, tests): embed the sections directly
+        similarity = section_similarity(sec_a, sec_b, ctx.embedder)
 
     def cite(ref: Any, unit: Any) -> str:
         return ctx.registry.add(
@@ -195,7 +210,7 @@ def compare_sections(ctx: AgentContext, args: CompareSectionsArgs) -> dict[str, 
         "item": item,
         "filing_a": {"fiscal_year": year_a, "accession_no": ref_a.accession_no},
         "filing_b": {"fiscal_year": year_b, "accession_no": ref_b.accession_no},
-        "similarity": section_similarity(sec_a, sec_b, ctx.embedder),
+        "similarity": similarity,
         "counts": {
             "paragraphs_added": len(paragraphs.added),
             "paragraphs_removed": len(paragraphs.removed),

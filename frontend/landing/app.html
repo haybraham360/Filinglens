@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>FilingLens app — ask SEC filings, check every quote</title>
+  <meta name="description" content="Ask questions about 10-K filings and get answers quoted from the filing, see what changed between years, and read reported financials." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&family=Schibsted+Grotesk:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="app.css" />
+</head>
+<body class="appbody">
+  <a class="skip" href="#main">Skip to content</a>
+
+  <header class="nav is-scrolled">
+    <div class="wrap nav__inner">
+      <a class="brand" href="/" aria-label="FilingLens home">
+        <svg class="brand__mark" viewBox="0 0 32 32" aria-hidden="true">
+          <rect x="5" y="3" width="17" height="22" rx="2" fill="none" stroke="currentColor" stroke-width="2.2"/>
+          <path d="M9 9h9M9 13h9M9 17h5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          <circle cx="21" cy="20" r="6" fill="var(--marker)" stroke="currentColor" stroke-width="2.2"/>
+          <path d="M25.5 24.5 29 28" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/>
+        </svg>
+        FilingLens
+      </a>
+      <nav aria-label="App sections">
+        <ul class="tabs" role="tablist">
+          <li><button role="tab" id="tab-ask" aria-controls="panel-ask" aria-selected="true">Ask</button></li>
+          <li><button role="tab" id="tab-diff" aria-controls="panel-diff" aria-selected="false">What changed</button></li>
+          <li><button role="tab" id="tab-fin" aria-controls="panel-fin" aria-selected="false">Financials</button></li>
+        </ul>
+      </nav>
+      <span class="status" id="status" aria-live="polite">Connecting…</span>
+    </div>
+  </header>
+
+  <main id="main" class="wrap app">
+    <div class="banner" id="banner" hidden></div>
+
+    <!-- ASK -->
+    <section class="panel" id="panel-ask" role="tabpanel" aria-labelledby="tab-ask">
+      <form class="askform" id="askForm">
+        <div class="scope">
+          <label>Company
+            <select id="askTicker"><option value="">All companies</option></select>
+          </label>
+          <label>Fiscal year
+            <select id="askYear"><option value="">Any year</option></select>
+          </label>
+        </div>
+        <label class="qlabel" for="askQ">Your question</label>
+        <div class="qrow">
+          <textarea id="askQ" rows="2" maxlength="500" placeholder="e.g. What does Apple say about supplier concentration?" required></textarea>
+          <button class="btn" type="submit" id="askBtn">Ask</button>
+        </div>
+        <div class="examples" id="examples" aria-label="Example questions"></div>
+      </form>
+
+      <div class="result" id="askResult" hidden>
+        <article class="ans">
+          <div class="ans__meta" id="ansMeta"></div>
+          <div class="ans__text" id="ansText"></div>
+          <details class="how" id="how">
+            <summary>How I got this answer</summary>
+            <ol id="howSteps"></ol>
+          </details>
+        </article>
+        <aside class="src" aria-live="polite">
+          <div class="src__head" id="srcHead">Click a citation to see the passage it came from.</div>
+          <div class="src__body" id="srcBody"></div>
+          <ul class="cites" id="citeList" aria-label="Citations"></ul>
+        </aside>
+      </div>
+    </section>
+
+    <!-- WHAT CHANGED -->
+    <section class="panel" id="panel-diff" role="tabpanel" aria-labelledby="tab-diff" hidden>
+      <form class="diffform" id="diffForm">
+        <label>Company <select id="diffTicker" required></select></label>
+        <label>Section
+          <select id="diffItem">
+            <option value="1A">Item 1A · Risk Factors</option>
+            <option value="7">Item 7 · MD&amp;A</option>
+            <option value="3">Item 3 · Legal Proceedings</option>
+            <option value="1">Item 1 · Business</option>
+          </select>
+        </label>
+        <label>From <select id="diffA"></select></label>
+        <label>To <select id="diffB"></select></label>
+        <button class="btn" type="submit">Compare</button>
+      </form>
+      <div id="diffResult"></div>
+    </section>
+
+    <!-- FINANCIALS -->
+    <section class="panel" id="panel-fin" role="tabpanel" aria-labelledby="tab-fin" hidden>
+      <form class="diffform" id="finForm">
+        <label>Company <select id="finTicker" required></select></label>
+        <button class="btn" type="submit">Show financials</button>
+      </form>
+      <div id="finResult"></div>
+    </section>
+  </main>
+
+  <footer class="foot">
+    <div class="wrap foot__inner">
+      <p><strong>FilingLens</strong>. Data from SEC EDGAR. Not investment advice.</p>
+      <p>Answers quote the filings verbatim; every number comes from reported XBRL data.</p>
+    </div>
+  </footer>
+
+  <script type="module" src="./app-page.js"></script>
+</body>
+</html>
