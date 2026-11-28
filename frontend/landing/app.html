@@ -3,112 +3,132 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>FilingLens app — ask SEC filings, check every quote</title>
-  <meta name="description" content="Ask questions about 10-K filings and get answers quoted from the filing, see what changed between years, and read reported financials." />
+  <title>FilingLens · Ask a company's yearly report</title>
+  <meta name="description" content="Ask questions about big US companies' yearly reports and get plain-English answers with the exact sentence highlighted, see what changed between years, and read their numbers explained." />
   <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&family=Schibsted+Grotesk:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600;12..96,700;12..96,800&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="styles.css" />
   <link rel="stylesheet" href="app.css" />
 </head>
 <body class="appbody">
   <a class="skip" href="#main">Skip to content</a>
 
-  <header class="nav is-scrolled">
+  <header class="nav">
     <div class="wrap nav__inner">
       <a class="brand" href="/" aria-label="FilingLens home">
         <svg class="brand__mark" viewBox="0 0 32 32" aria-hidden="true">
-          <rect x="5" y="3" width="17" height="22" rx="2" fill="none" stroke="currentColor" stroke-width="2.2"/>
-          <path d="M9 9h9M9 13h9M9 17h5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-          <circle cx="21" cy="20" r="6" fill="var(--marker)" stroke="currentColor" stroke-width="2.2"/>
-          <path d="M25.5 24.5 29 28" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/>
+          <rect x="4" y="3" width="18" height="24" rx="4" fill="currentColor"/>
+          <rect x="8" y="9" width="10" height="3.2" rx="1.6" fill="var(--hl)"/>
+          <rect x="8" y="15" width="10" height="2.2" rx="1.1" fill="var(--violet)" opacity=".35"/>
+          <rect x="8" y="19.5" width="6" height="2.2" rx="1.1" fill="var(--violet)" opacity=".35"/>
+          <circle cx="23" cy="21" r="6" fill="var(--hl)" stroke="var(--violet)" stroke-width="2.4"/>
         </svg>
         FilingLens
       </a>
       <nav aria-label="App sections">
         <ul class="tabs" role="tablist">
-          <li><button role="tab" id="tab-ask" aria-controls="panel-ask" aria-selected="true">Ask</button></li>
+          <li><button role="tab" id="tab-ask" aria-controls="panel-ask" aria-selected="true">Ask a question</button></li>
           <li><button role="tab" id="tab-diff" aria-controls="panel-diff" aria-selected="false">What changed</button></li>
-          <li><button role="tab" id="tab-fin" aria-controls="panel-fin" aria-selected="false">Financials</button></li>
+          <li><button role="tab" id="tab-fin" aria-controls="panel-fin" aria-selected="false">The numbers</button></li>
         </ul>
       </nav>
       <span class="status" id="status" aria-live="polite">Connecting…</span>
     </div>
   </header>
 
-  <main id="main" class="wrap app">
-    <div class="banner" id="banner" hidden></div>
+  <main id="main" class="app">
+    <div class="wrap">
+      <div class="banner" id="banner" hidden></div>
 
-    <!-- ASK -->
-    <section class="panel" id="panel-ask" role="tabpanel" aria-labelledby="tab-ask">
-      <form class="askform" id="askForm">
-        <div class="scope">
-          <label>Company
-            <select id="askTicker"><option value="">All companies</option></select>
-          </label>
-          <label>Fiscal year
-            <select id="askYear"><option value="">Any year</option></select>
-          </label>
+      <!-- COMPANY PICKER (shared by every tab) -->
+      <section class="picker" aria-labelledby="pickerLabel">
+        <h2 class="picker__label" id="pickerLabel">Which company?</h2>
+        <div class="picker__list" id="picker" role="radiogroup" aria-labelledby="pickerLabel">
+          <span class="picker__loading">Loading companies…</span>
         </div>
-        <label class="qlabel" for="askQ">Your question</label>
-        <div class="qrow">
-          <textarea id="askQ" rows="2" maxlength="500" placeholder="e.g. What does Apple say about supplier concentration?" required></textarea>
-          <button class="btn" type="submit" id="askBtn">Ask</button>
+      </section>
+
+      <!-- ASK -->
+      <section class="panel" id="panel-ask" role="tabpanel" aria-labelledby="tab-ask">
+        <div class="intro" id="askIntro">
+          <h1 class="intro__title" id="introTitle">What do you want to know?</h1>
+          <p class="intro__sub">Ask in plain words. Every answer comes with the sentence from the report that backs it up.</p>
         </div>
-        <div class="examples" id="examples" aria-label="Example questions"></div>
-      </form>
 
-      <div class="result" id="askResult" hidden>
-        <article class="ans">
-          <div class="ans__meta" id="ansMeta"></div>
-          <div class="ans__text" id="ansText"></div>
-          <details class="how" id="how">
-            <summary>How I got this answer</summary>
-            <ol id="howSteps"></ol>
-          </details>
-        </article>
-        <aside class="src" aria-live="polite">
-          <div class="src__head" id="srcHead">Click a citation to see the passage it came from.</div>
-          <div class="src__body" id="srcBody"></div>
-          <ul class="cites" id="citeList" aria-label="Citations"></ul>
-        </aside>
-      </div>
-    </section>
+        <form class="composer" id="askForm">
+          <label class="sr" for="askQ">Your question</label>
+          <textarea id="askQ" rows="2" maxlength="500" placeholder="e.g. What are the biggest risks to this company?" required></textarea>
+          <div class="composer__bar">
+            <label class="yearpick">Which year's report?
+              <select id="askYear"><option value="">Any year</option></select>
+            </label>
+            <button class="btn" type="submit" id="askBtn">Ask</button>
+          </div>
+        </form>
+        <div class="suggest" id="examples" aria-label="Suggested questions"></div>
 
-    <!-- WHAT CHANGED -->
-    <section class="panel" id="panel-diff" role="tabpanel" aria-labelledby="tab-diff" hidden>
-      <form class="diffform" id="diffForm">
-        <label>Company <select id="diffTicker" required></select></label>
-        <label>Section
-          <select id="diffItem">
-            <option value="1A">Item 1A · Risk Factors</option>
-            <option value="7">Item 7 · MD&amp;A</option>
-            <option value="3">Item 3 · Legal Proceedings</option>
-            <option value="1">Item 1 · Business</option>
-          </select>
-        </label>
-        <label>From <select id="diffA"></select></label>
-        <label>To <select id="diffB"></select></label>
-        <button class="btn" type="submit">Compare</button>
-      </form>
-      <div id="diffResult"></div>
-    </section>
+        <div class="result" id="askResult" hidden>
+          <div class="convo">
+            <div class="q-bubble" id="qBubble"></div>
+            <article class="ans">
+              <div class="ans__meta" id="ansMeta"></div>
+              <div class="ans__text" id="ansText"></div>
+              <details class="how" id="how">
+                <summary>How FilingLens found this</summary>
+                <ol id="howSteps"></ol>
+              </details>
+            </article>
+          </div>
+          <aside class="src" aria-labelledby="srcTitle">
+            <h2 class="src__title" id="srcTitle">The receipt</h2>
+            <div class="src__head" id="srcHead">Tap a numbered tag in the answer to see the sentence it came from.</div>
+            <div class="src__body" id="srcBody" aria-live="polite"></div>
+            <ul class="cites" id="citeList" aria-label="All sources for this answer"></ul>
+          </aside>
+        </div>
+      </section>
 
-    <!-- FINANCIALS -->
-    <section class="panel" id="panel-fin" role="tabpanel" aria-labelledby="tab-fin" hidden>
-      <form class="diffform" id="finForm">
-        <label>Company <select id="finTicker" required></select></label>
-        <button class="btn" type="submit">Show financials</button>
-      </form>
-      <div id="finResult"></div>
-    </section>
+      <!-- WHAT CHANGED -->
+      <section class="panel" id="panel-diff" role="tabpanel" aria-labelledby="tab-diff" hidden>
+        <div class="intro">
+          <h1 class="intro__title">What did they change?</h1>
+          <p class="intro__sub">Companies copy most of last year's report and edit a few lines. Pick a section and two years to see exactly what was added and dropped.</p>
+        </div>
+        <p class="needco" id="diffNeed" hidden>Pick a company above to compare its reports.</p>
+        <form class="toolbar" id="diffForm">
+          <label>Which part of the report?
+            <select id="diffItem">
+              <option value="1A">Risks the company warns about</option>
+              <option value="7">Management's explanation of the year</option>
+              <option value="3">Lawsuits and legal issues</option>
+              <option value="1">What the business does</option>
+            </select>
+          </label>
+          <label>Compare <select id="diffA"></select></label>
+          <label>with <select id="diffB"></select></label>
+          <button class="btn" type="submit">Compare</button>
+        </form>
+        <div id="diffResult"></div>
+      </section>
+
+      <!-- THE NUMBERS -->
+      <section class="panel" id="panel-fin" role="tabpanel" aria-labelledby="tab-fin" hidden>
+        <div class="intro">
+          <h1 class="intro__title">How is the business doing?</h1>
+          <p class="intro__sub">The key figures from each yearly report, in plain English. Every number comes from the company's own reported data.</p>
+        </div>
+        <p class="needco" id="finNeed" hidden>Pick a company above to see its numbers.</p>
+        <div id="finResult"></div>
+      </section>
+    </div>
   </main>
 
   <footer class="foot">
     <div class="wrap foot__inner">
       <p><strong>FilingLens</strong>. Data from SEC EDGAR. Not investment advice.</p>
-      <p>Answers quote the filings verbatim; every number comes from reported XBRL data.</p>
+      <p>Quotes are checked word for word against the report. Numbers come from reported data, never from the AI.</p>
     </div>
   </footer>
 
